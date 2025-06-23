@@ -1,0 +1,287 @@
+#pragma once
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* 数据类型枚举 */
+typedef enum {
+    TYPE_INT,
+    TYPE_REAL,
+    TYPE_DOUBLE,
+    TYPE_TEXT,
+    TYPE_ALPHA,
+    TYPE_SET,
+    TYPE_VOID
+} DataType;
+
+/* 二元运算符 */
+typedef enum {
+    BINOP_ADD,
+    BINOP_SUB,
+    BINOP_MUL,
+    BINOP_DIV,
+    BINOP_POW,
+    BINOP_EQ,
+    BINOP_NE,
+    BINOP_LT,
+    BINOP_GT,
+    BINOP_LE,
+    BINOP_GE,
+    BINOP_AND,
+    BINOP_OR
+} BinaryOperator;
+
+/* 一元运算符 */
+typedef enum {
+    UNOP_NOT,
+    UNOP_MINUS
+} UnaryOperator;
+
+/* 集合操作类型 */
+typedef enum {
+    SET_OP_UNION,        /* + */
+    SET_OP_INTERSECTION, /* * */
+    SET_OP_DIFFERENCE,   /* - */
+    SET_OP_CONTAINS,     /* IN */
+    SET_OP_ADD_ELEMENT,  /* FILE element IN set */
+    SET_OP_REMOVE_ELEMENT /* REMOVE element FROM set */
+} SetOperationType;
+
+/* AST 节点类型 */
+typedef enum {
+    NODE_PROGRAM,
+    NODE_STATEMENT_LIST,
+    NODE_VARIABLE_DECLARATION,
+    NODE_ENTITY_DECLARATION,
+    NODE_EVENT_DECLARATION,
+    NODE_FUNCTION_DECLARATION,
+    NODE_ASSIGNMENT,
+    NODE_IF,
+    NODE_WHILE,
+    NODE_FOR,
+    NODE_RETURN,
+    NODE_WRITE,
+    NODE_BINARY_EXPRESSION,
+    NODE_UNARY_EXPRESSION,
+    NODE_INTEGER_LITERAL,
+    NODE_FLOAT_LITERAL,
+    NODE_STRING_LITERAL,
+    NODE_IDENTIFIER,
+    NODE_FUNCTION_CALL,
+    NODE_ATTRIBUTE_LIST,
+    NODE_ATTRIBUTE,
+    NODE_PARAMETER_LIST,
+    NODE_PARAMETER,
+    NODE_EXPRESSION_LIST,
+    NODE_SET_CREATION,
+    NODE_SET_OPERATION
+} NodeType;
+
+/* 前向声明 */
+typedef struct ASTNode ASTNode;
+
+/* AST 节点结构 */
+struct ASTNode {
+    NodeType type;
+    int line;
+    int column;
+    
+    union {
+        struct {
+            ASTNode* preamble;
+            ASTNode* main;
+        } program;
+        
+        struct {
+            ASTNode* statements;
+            int count;
+            int capacity;
+        } statement_list;
+        
+        struct {
+            char* name;
+            DataType type;
+            ASTNode* initializer;
+        } variable_declaration;
+        
+        struct {
+            char* name;
+            ASTNode* attributes;
+        } entity_declaration;
+        
+        struct {
+            char* name;
+            ASTNode* parameters;
+        } event_declaration;
+        
+        struct {
+            char* name;
+            ASTNode* parameters;
+            DataType return_type;
+            ASTNode* body;
+        } function_declaration;
+        
+        struct {
+            char* target;
+            ASTNode* value;
+        } assignment;
+        
+        struct {
+            ASTNode* condition;
+            ASTNode* then_branch;
+            ASTNode* else_branch;
+        } if_stmt;
+        
+        struct {
+            ASTNode* condition;
+            ASTNode* body;
+        } while_stmt;
+        
+        struct {
+            char* variable;
+            ASTNode* start;
+            ASTNode* end;
+            ASTNode* step;
+            ASTNode* body;
+        } for_stmt;
+        
+        struct {
+            ASTNode* value;
+        } return_stmt;
+        
+        struct {
+            ASTNode* expression;
+        } write_stmt;
+        
+        struct {
+            ASTNode* left;
+            BinaryOperator op;
+            ASTNode* right;
+        } binary_expression;
+        
+        struct {
+            UnaryOperator op;
+            ASTNode* operand;
+        } unary_expression;
+        
+        struct {
+            int value;
+        } integer_literal;
+        
+        struct {
+            double value;
+        } float_literal;
+        
+        struct {
+            char* value;
+        } string_literal;
+        
+        struct {
+            char* name;
+        } identifier;
+        
+        struct {
+            char* name;
+            ASTNode* arguments;
+        } function_call;
+        
+        struct {
+            ASTNode** items;
+            int count;
+            int capacity;
+        } list;
+        
+        struct {
+            char* name;
+            DataType type;
+        } attribute;
+        
+        struct {
+            char* name;
+            DataType type;
+        } parameter;
+        
+        struct {
+            ASTNode* elements;
+        } set_creation;
+        
+        struct {
+            SetOperationType op;
+            ASTNode* left;
+            ASTNode* right;
+        } set_operation;
+    } data;
+};
+
+/* AST 节点创建函数 */
+ASTNode* create_program_node(ASTNode* preamble, ASTNode* main);
+ASTNode* create_statement_list_node();
+ASTNode* create_variable_declaration_node(char* name, DataType type, ASTNode* initializer);
+ASTNode* create_entity_declaration_node(char* name, ASTNode* attributes);
+ASTNode* create_event_declaration_node(char* name, ASTNode* parameters);
+ASTNode* create_function_declaration_node(char* name, ASTNode* parameters, DataType return_type, ASTNode* body);
+ASTNode* create_assignment_node(char* target, ASTNode* value);
+ASTNode* create_if_node(ASTNode* condition, ASTNode* then_branch, ASTNode* else_branch);
+ASTNode* create_while_node(ASTNode* condition, ASTNode* body);
+ASTNode* create_for_node(char* variable, ASTNode* start, ASTNode* end, ASTNode* step, ASTNode* body);
+ASTNode* create_return_node(ASTNode* value);
+ASTNode* create_write_node(ASTNode* expression);
+ASTNode* create_binary_expression_node(ASTNode* left, BinaryOperator op, ASTNode* right);
+ASTNode* create_unary_expression_node(UnaryOperator op, ASTNode* operand);
+ASTNode* create_integer_literal_node(int value);
+ASTNode* create_float_literal_node(double value);
+ASTNode* create_string_literal_node(char* value);
+ASTNode* create_identifier_node(char* name);
+ASTNode* create_function_call_node(char* name, ASTNode* arguments);
+ASTNode* create_attribute_list_node();
+ASTNode* create_attribute_node(char* name, DataType type);
+ASTNode* create_parameter_list_node();
+ASTNode* create_parameter_node(char* name, DataType type);
+ASTNode* create_expression_list_node();
+ASTNode* create_set_creation_node(ASTNode* elements);
+ASTNode* create_set_operation_node(SetOperationType op, ASTNode* left, ASTNode* right);
+
+/* 列表操作函数 */
+void add_statement_to_list(ASTNode* list, ASTNode* statement);
+void add_attribute_to_list(ASTNode* list, ASTNode* attribute);
+void add_parameter_to_list(ASTNode* list, ASTNode* parameter);
+void add_expression_to_list(ASTNode* list, ASTNode* expression);
+
+/* AST 访问者接口 */
+typedef struct {
+    void (*visit_program)(ASTNode* node, void* context);
+    void (*visit_statement_list)(ASTNode* node, void* context);
+    void (*visit_variable_declaration)(ASTNode* node, void* context);
+    void (*visit_entity_declaration)(ASTNode* node, void* context);
+    void (*visit_event_declaration)(ASTNode* node, void* context);
+    void (*visit_function_declaration)(ASTNode* node, void* context);
+    void (*visit_assignment)(ASTNode* node, void* context);
+    void (*visit_if)(ASTNode* node, void* context);
+    void (*visit_while)(ASTNode* node, void* context);
+    void (*visit_for)(ASTNode* node, void* context);
+    void (*visit_return)(ASTNode* node, void* context);
+    void (*visit_write)(ASTNode* node, void* context);
+    void (*visit_binary_expression)(ASTNode* node, void* context);
+    void (*visit_unary_expression)(ASTNode* node, void* context);
+    void (*visit_integer_literal)(ASTNode* node, void* context);
+    void (*visit_float_literal)(ASTNode* node, void* context);
+    void (*visit_string_literal)(ASTNode* node, void* context);
+    void (*visit_identifier)(ASTNode* node, void* context);
+    void (*visit_function_call)(ASTNode* node, void* context);
+    void (*visit_set_creation)(ASTNode* node, void* context);
+    void (*visit_set_operation)(ASTNode* node, void* context);
+} ASTVisitor;
+
+/* AST 遍历函数 */
+void ast_visit(ASTNode* node, ASTVisitor* visitor, void* context);
+
+/* 内存管理 */
+void free_ast(ASTNode* node);
+
+/* 调试输出 */
+void print_ast_tree(ASTNode* node, int indent);
+
+#ifdef __cplusplus
+}
+#endif
