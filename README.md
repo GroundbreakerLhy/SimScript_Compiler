@@ -1,7 +1,8 @@
-# SIMSCRIPT II.5 编译器./build/simscript_compiler tests/basic/test_simple.sim --print-ir
-./build/simscript_compiler tests/basic/test_math.sim --print-ir
+# SIMSCRIPT II.5 编译器
 
-这是一个基于 SIMSCRIPT II.5 语言的编译器前端实现，使用 Flex/Bison 自动生成词法和语## 支持的语言特性
+这是一个基于 SIMSCRIPT II.5 语言的编译器前端实现，使用 Flex/Bison 自动生成词法和语法分析器。
+
+## 支持的语言特性
 
 - [x] 基本数据类型 (INT, REAL, DOUBLE, TEXT, ALPHA)
 - [x] 控制流语句 (IF/WHILE/FOR)
@@ -111,21 +112,3 @@ gcc output.s -o executable
 - [x] 变量声明和赋值
 - [x] 数学表达式计算
 - [x] 输入输出操作 (WRITE/READ)
-- [ ] 集合操作 (计划中)
-- [ ] 仿真特性 (计划中)
-
-## 开发状态
-
-- ✅ Flex 词法分析器
-- ✅ Bison 语法分析器  
-- ✅ AST 定义和构建
-- ✅ LLVM IR 代码生成器
-- ✅ 基本语法支持
-- 🔄 扩展语法特性
-- 📋 测试和文档完善
-
-## 架构优势
-
-- **自动化前端**: 使用 Flex/Bison 自动生成词法和语法分析器，减少手写代码
-- **简洁设计**: 精简的 C/C++ 混合架构，易于维护和扩展
-- **标准工具链**: 基于成熟的编译器构建工具，稳定可靠
