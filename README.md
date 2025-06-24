@@ -1,114 +1,110 @@
 # SIMSCRIPT II.5 编译器
 
-这是一个基于 SIMSCRIPT II.5 语言的编译器前端实现，使用 Flex/Bison 自动生成词法和语法分析器。
+基于 SIMSCRIPT II.5 语言规范的编译器前端实现，采用 Flex/Bison 工具链构建词法语法分析器，生成 LLVM IR 中间代码。
 
-## 支持的语言特性
+## 技术架构
 
-- [x] 基本数据类型 (INT, REAL, DOUBLE, TEXT, ALPHA)
-- [x] 控制流语句 (IF/WHILE/FOR)
-- [x] 变量声明和赋值
-- [x] 数学表达式计算 (+, -, *, /)
-- [x] 输入输出操作 (WRITE TO SCREEN)
-- [x] 注释支持 (行内注释 '' )
-- [x] PREAMBLE 和 MAIN 代码块
-## 测试
+| 组件 | 实现方案 | 功能 |
+|------|----------|------|
+| 词法分析 | Flex 2.6+ | Token流生成 |
+| 语法分析 | Bison 3.0+ | AST构建 |
+| 代码生成 | LLVM 14.0+ | IR代码生成 |
+| 构建系统 | CMake 3.16+ | 自动化构建 |
 
-```bash
-# 运行基本测试
-./build/simscript_compiler tests/basic/test_simple.ss --print-ir
-./build/simscript_compiler tests/basic/test_math.ss --print-ir
+## 语言特性支持
 
-# 编译并运行生成的代码
-llc output.ll -o output.s
-gcc -no-pie output.s -o executable
-./executable
-```
-MSCRIPT 源代码编译为 LLVM IR。
+### 核心语法
+- 数据类型：INT, REAL, DOUBLE, TEXT, ALPHA, SET
+- 程序结构：PREAMBLE声明段, MAIN主程序段
+- 变量操作：DEFINE声明, LET赋值
+- 控制流：IF/ELSEIF/ELSE, WHILE, FOR, FOR EACH
+
+### 高级特性
+- 函数定义：ROUTINE 定义与调用，参数传递
+- 数据结构：ENTITY 实体, EVENT 事件
+- 表达式：算术运算、逻辑运算、比较运算
+- 输入输出：WRITE TO SCREEN, 文件 I/O 语法
+- 仿真支持：START SIMULATION, SCHEDULE 事件调度
 
 ## 项目结构
 
 ```
-SimScript_Compiler/
-├── src/                    # 源代码目录
-│   ├── frontend/          # 前端组件 (Flex/Bison)
-│   │   ├── lexer.l        # Flex 词法分析器规则
-│   │   ├── parser.y       # Bison 语法分析器规则
-│   │   ├── ast.h          # AST 节点定义
-│   │   ├── ast.c          # AST 节点实现
-│   │   ├── symbol_table.h # 符号表定义
-│   │   └── symbol_table.c # 符号表实现
-│   ├── codegen/           # LLVM IR 代码生成器
-│   │   ├── codegen.h      # 代码生成器接口
-│   │   └── codegen.cpp    # 代码生成器实现
-│   └── main.cpp           # 编译器主程序
-├── tests/                 # 测试用例 (*.sim)
-│   └── basic/             # 基础功能测试
-├── docs/                  # 文档
-├── CMakeLists.txt         # CMake 构建文件
-├── build.sh               # 构建脚本
-├── test.sh                # 测试脚本
-└── README.md              # 项目说明
+src/
+├── frontend/              # 编译器前端
+│   ├── lexer.l           # Flex词法规则
+│   ├── parser.y          # Bison语法规则
+│   ├── ast.[h|c]         # 抽象语法树
+│   └── symbol_table.[h|c] # 符号表管理
+├── codegen/              # 代码生成后端
+│   ├── codegen.h         # 代码生成接口
+│   └── codegen.cpp       # LLVM IR生成
+└── main.cpp              # 编译器入口
+
+tests/basic/              # 测试用例集合
+docs/                     # 技术文档
+CMakeLists.txt           # 构建配置
+build.sh                 # 构建脚本
+test.sh                  # 测试脚本
 ```
 
-## 依赖项
+## 构建与安装
 
-- **Flex** 2.6+ (词法分析器生成器)
-- **Bison** 3.0+ (语法分析器生成器)
-- **LLVM** 16.0+ (用于 IR 生成)
-- **CMake** 3.16+ (构建系统)
-- **GCC/Clang** (C/C++17 编译器)
-
-## 编译器架构
-
-1. **词法分析** - Flex 自动生成的词法分析器，将源代码转换为 Token 流
-2. **语法分析** - Bison 自动生成的语法分析器，构建抽象语法树 (AST)
-3. **代码生成** - 遍历 AST 生成 LLVM IR
-
-## 构建方法
-
-### 安装依赖 (Ubuntu/Debian)
+### 系统要求
 ```bash
-sudo apt-get update
-sudo apt-get install flex bison llvm-16-dev cmake build-essential
+# Ubuntu/Debian
+sudo apt-get install flex bison llvm-14-dev cmake build-essential
+
+# CentOS/RHEL
+sudo yum install flex bison llvm-devel cmake gcc-c++
 ```
 
-### 编译
+### 编译流程
 ```bash
-chmod +x build.sh
 ./build.sh
 ```
 
-或者手动编译：
+### 手动构建
 ```bash
-mkdir -p build
-cd build
+mkdir build && cd build
 cmake ..
 make -j$(nproc)
 ```
 
-## 使用方法
+## 使用说明
 
+### 基本编译
 ```bash
-# 编译 SIMSCRIPT 源文件
-./simscript_compiler input.sim -o output.ll
-
-# 查看生成的 AST
-./simscript_compiler input.sim --print-ast
-
-# 查看生成的 LLVM IR
-./simscript_compiler input.sim --print-ir
-
-# 使用 LLVM 工具链生成可执行文件
+./build/simscript_compiler input.sim -o output.ll
 llc output.ll -o output.s
-gcc output.s -o executable
+gcc -no-pie output.s -o executable
+./executable
 ```
 
-## 支持的语言特性
+### 调试选项
+```bash
+./build/simscript_compiler input.sim --print-ast    # 输出语法树
+./build/simscript_compiler input.sim --print-ir     # 输出LLVM IR
+```
 
-- [x] 基本数据类型 (INT, REAL, DOUBLE, TEXT, ALPHA)
-- [x] 实体 (ENTITY) 和事件 (EVENT) 定义
-- [x] 控制流语句 (IF/WHILE/FOR)
-- [x] 函数和过程定义 (ROUTINE)
-- [x] 变量声明和赋值
-- [x] 数学表达式计算
-- [x] 输入输出操作 (WRITE/READ)
+### 测试验证
+```bash
+./test.sh    # 运行完整测试套件
+```
+
+## 实现状态
+
+| 功能模块 | 状态 | 备注 |
+|----------|------|------|
+| 词法语法分析 | ✓ | 完整支持SIMSCRIPT语法 |
+| 类型系统 | ✓ | 支持基本类型与自动推断 |
+| 控制流语句 | ✓ | IF/WHILE/FOR/ELSEIF |
+| 函数系统 | ✓ | 定义、调用、参数传递 |
+| 实体事件 | ✓ | 语法解析完成 |
+| 仿真控制 | ✓ | 语法解析完成 |
+| 文件I/O | ✓ | 语法解析完成 |
+| 运行时库 | ○ | 仿真引擎待实现 |
+
+## 技术文档
+
+- [实现状态详细说明](docs/IMPLEMENTATION_STATUS.md)
+- [语法规范](docs/syntax.md)

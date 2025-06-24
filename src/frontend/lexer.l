@@ -71,6 +71,17 @@ WHITESPACE  [ \t]+
 "WRITE"             { return WRITE; }
 "READ"              { return READ_KW; }
 "SCREEN"            { return SCREEN; }
+"OPEN"              { return OPEN; }
+"CLOSE"             { return CLOSE; }
+"FILE"              { return FILE_KW; }
+"START"             { return START; }
+"SIMULATION"        { return SIMULATION; }
+"SCHEDULE"          { return SCHEDULE; }
+"TIME"              { return TIME; }
+"ADVANCE"           { return ADVANCE; }
+"BY"                { return BY; }
+"AT"                { return AT; }
+"WITH"              { return WITH; }
 "ADD"               { return ADD; }
 "REMOVE"            { return REMOVE; }
 "FROM"              { return FROM; }

@@ -60,8 +60,16 @@ typedef enum {
     NODE_IF,
     NODE_WHILE,
     NODE_FOR,
+    NODE_FOR_EACH,
     NODE_RETURN,
     NODE_WRITE,
+    NODE_WRITE_TO_FILE,
+    NODE_OPEN_FILE,
+    NODE_CLOSE_FILE,
+    NODE_READ_FROM_FILE,
+    NODE_START_SIMULATION,
+    NODE_SCHEDULE,
+    NODE_ADVANCE_TIME,
     NODE_BINARY_EXPRESSION,
     NODE_UNARY_EXPRESSION,
     NODE_INTEGER_LITERAL,
@@ -147,12 +155,51 @@ struct ASTNode {
         } for_stmt;
         
         struct {
+            char* variable;
+            ASTNode* set;
+            ASTNode* body;
+        } for_each_stmt;
+        
+        struct {
             ASTNode* value;
         } return_stmt;
         
         struct {
             ASTNode* expression;
         } write_stmt;
+        
+        struct {
+            ASTNode* expression;
+            char* filename;
+        } write_to_file_stmt;
+        
+        struct {
+            char* filename;
+            int file_id;
+        } open_file_stmt;
+        
+        struct {
+            int file_id;
+        } close_file_stmt;
+        
+        struct {
+            char* variable;
+            int file_id;
+        } read_from_file_stmt;
+        
+        struct {
+            /* 开始仿真语句 */
+        } start_simulation_stmt;
+        
+        struct {
+            char* event_name;
+            ASTNode* time;
+            ASTNode* parameters;
+        } schedule_stmt;
+        
+        struct {
+            ASTNode* delta_time;
+        } advance_time_stmt;
         
         struct {
             ASTNode* left;
@@ -223,10 +270,19 @@ ASTNode* create_event_declaration_node(char* name, ASTNode* parameters);
 ASTNode* create_function_declaration_node(char* name, ASTNode* parameters, DataType return_type, ASTNode* body);
 ASTNode* create_assignment_node(char* target, ASTNode* value);
 ASTNode* create_if_node(ASTNode* condition, ASTNode* then_branch, ASTNode* else_branch);
+ASTNode* combine_elseif_chain(ASTNode* first_if, ASTNode* second_if);
 ASTNode* create_while_node(ASTNode* condition, ASTNode* body);
 ASTNode* create_for_node(char* variable, ASTNode* start, ASTNode* end, ASTNode* step, ASTNode* body);
+ASTNode* create_for_each_node(char* variable, ASTNode* set, ASTNode* body);
 ASTNode* create_return_node(ASTNode* value);
 ASTNode* create_write_node(ASTNode* expression);
+ASTNode* create_write_to_file_node(ASTNode* expression, char* filename);
+ASTNode* create_open_file_node(char* filename, int file_id);
+ASTNode* create_close_file_node(int file_id);
+ASTNode* create_read_from_file_node(char* variable, int file_id);
+ASTNode* create_start_simulation_node();
+ASTNode* create_schedule_node(char* event_name, ASTNode* time, ASTNode* parameters);
+ASTNode* create_advance_time_node(ASTNode* delta_time);
 ASTNode* create_binary_expression_node(ASTNode* left, BinaryOperator op, ASTNode* right);
 ASTNode* create_unary_expression_node(UnaryOperator op, ASTNode* operand);
 ASTNode* create_integer_literal_node(int value);

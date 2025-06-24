@@ -72,6 +72,25 @@ static LLVMTypeRef get_llvm_type(CodeGenerator* codegen, DataType type) {
     }
 }
 
+/* 从LLVM值推断SIMSCRIPT类型 */
+static DataType infer_type_from_llvm_value(CodeGenerator* codegen, LLVMValueRef value) {
+    if (!value) return TYPE_INT;
+    
+    LLVMTypeRef type = LLVMTypeOf(value);
+    LLVMTypeKind kind = LLVMGetTypeKind(type);
+    
+    switch (kind) {
+        case LLVMIntegerTypeKind:
+            return TYPE_INT;
+        case LLVMDoubleTypeKind:
+            return TYPE_REAL;
+        case LLVMPointerTypeKind:
+            return TYPE_TEXT; // 假设指针类型是字符串
+        default:
+            return TYPE_INT;
+    }
+}
+
 /* 生成表达式 */
 static LLVMValueRef codegen_expression(CodeGenerator* codegen, ASTNode* node) {
     if (!node) return NULL;
@@ -248,8 +267,8 @@ static void codegen_statement(CodeGenerator* codegen, ASTNode* node) {
                 LLVMValueRef value = codegen_expression(codegen, node->data.assignment.value);
                 if (!value) return;
                 
-                // 推断类型（简化版本）
-                DataType inferred_type = TYPE_INT; // 默认为int，实际应该从value类型推断
+                // 从LLVM值推断类型
+                DataType inferred_type = infer_type_from_llvm_value(codegen, value);
                 
                 // 添加到符号表
                 if (!symbol_table_add(codegen->symbol_table, target, inferred_type)) {
@@ -289,7 +308,19 @@ static void codegen_statement(CodeGenerator* codegen, ASTNode* node) {
                     printf_func = LLVMAddFunction(codegen->module, "printf", printf_type);
                 }
                 
-                LLVMValueRef format = LLVMBuildGlobalStringPtr(codegen->builder, "%d\n", "fmt");
+                // 根据表达式类型选择格式字符串
+                LLVMTypeRef expr_type = LLVMTypeOf(expr);
+                LLVMTypeKind kind = LLVMGetTypeKind(expr_type);
+                
+                LLVMValueRef format;
+                if (kind == LLVMDoubleTypeKind) {
+                    format = LLVMBuildGlobalStringPtr(codegen->builder, "%.2f\n", "fmt");
+                } else if (kind == LLVMPointerTypeKind) {
+                    format = LLVMBuildGlobalStringPtr(codegen->builder, "%s\n", "fmt");
+                } else {
+                    format = LLVMBuildGlobalStringPtr(codegen->builder, "%d\n", "fmt");
+                }
+                
                 LLVMValueRef args[] = {format, expr};
                 
                 LLVMTypeRef printf_type = LLVMGetElementType(LLVMTypeOf(printf_func));
@@ -405,13 +436,19 @@ static void codegen_statement(CodeGenerator* codegen, ASTNode* node) {
             // 生成 then 分支
             LLVMPositionBuilderAtEnd(codegen->builder, then_block);
             codegen_statement(codegen, node->data.if_stmt.then_branch);
-            LLVMBuildBr(codegen->builder, merge_block);
+            // 只有在没有终结指令时才添加分支
+            if (!LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(codegen->builder))) {
+                LLVMBuildBr(codegen->builder, merge_block);
+            }
             
             // 生成 else 分支（如果存在）
             if (else_block) {
                 LLVMPositionBuilderAtEnd(codegen->builder, else_block);
                 codegen_statement(codegen, node->data.if_stmt.else_branch);
-                LLVMBuildBr(codegen->builder, merge_block);
+                // 只有在没有终结指令时才添加分支
+                if (!LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(codegen->builder))) {
+                    LLVMBuildBr(codegen->builder, merge_block);
+                }
             }
             
             // 继续在 merge 块
@@ -515,6 +552,68 @@ static void codegen_statement(CodeGenerator* codegen, ASTNode* node) {
                 codegen_statement(codegen, node->data.list.items[i]);
             }
             break;
+            
+        case NODE_FOR_EACH: {
+            // FOR EACH 循环 - 简化实现，假设集合是一个数组
+            const char* var_name = node->data.for_each_stmt.variable;
+            
+            // 创建循环变量
+            Symbol* loop_var = symbol_table_lookup(codegen->symbol_table, var_name);
+            if (!loop_var) {
+                symbol_table_add(codegen->symbol_table, var_name, TYPE_INT);
+                loop_var = symbol_table_lookup(codegen->symbol_table, var_name);
+                LLVMValueRef alloca = LLVMBuildAlloca(codegen->builder, LLVMInt32TypeInContext(codegen->context), var_name);
+                symbol_table_set_value(loop_var, alloca);
+            }
+            
+            // TODO: 实现真正的集合迭代逻辑
+            // 这里只是一个占位符实现
+            fprintf(stderr, "Warning: FOR EACH not fully implemented yet\n");
+            codegen_statement(codegen, node->data.for_each_stmt.body);
+            break;
+        }
+        
+        case NODE_WRITE_TO_FILE: {
+            // 写入文件 - 简化实现
+            fprintf(stderr, "Warning: WRITE TO FILE not fully implemented yet\n");
+            break;
+        }
+        
+        case NODE_OPEN_FILE: {
+            // 打开文件 - 简化实现
+            fprintf(stderr, "Warning: OPEN FILE not fully implemented yet\n");
+            break;
+        }
+        
+        case NODE_CLOSE_FILE: {
+            // 关闭文件 - 简化实现
+            fprintf(stderr, "Warning: CLOSE FILE not fully implemented yet\n");
+            break;
+        }
+        
+        case NODE_READ_FROM_FILE: {
+            // 从文件读取 - 简化实现
+            fprintf(stderr, "Warning: READ FROM FILE not fully implemented yet\n");
+            break;
+        }
+        
+        case NODE_START_SIMULATION: {
+            // 开始仿真 - 简化实现
+            fprintf(stderr, "Info: START SIMULATION encountered\n");
+            break;
+        }
+        
+        case NODE_SCHEDULE: {
+            // 调度事件 - 简化实现
+            fprintf(stderr, "Info: SCHEDULE event '%s'\n", node->data.schedule_stmt.event_name);
+            break;
+        }
+        
+        case NODE_ADVANCE_TIME: {
+            // 推进时间 - 简化实现
+            fprintf(stderr, "Info: ADVANCE TIME\n");
+            break;
+        }
             
         default:
             break;

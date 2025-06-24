@@ -84,6 +84,23 @@ ASTNode* create_if_node(ASTNode* condition, ASTNode* then_branch, ASTNode* else_
     return node;
 }
 
+/* 组合 elseif 链 */
+ASTNode* combine_elseif_chain(ASTNode* first_if, ASTNode* second_if) {
+    if (!first_if) return second_if;
+    if (!second_if) return first_if;
+    
+    /* 找到第一个if节点的最后一个else分支 */
+    ASTNode* current = first_if;
+    while (current->data.if_stmt.else_branch && 
+           current->data.if_stmt.else_branch->type == NODE_IF) {
+        current = current->data.if_stmt.else_branch;
+    }
+    
+    /* 将second_if连接到链的末尾 */
+    current->data.if_stmt.else_branch = second_if;
+    return first_if;
+}
+
 /* 创建 while 节点 */
 ASTNode* create_while_node(ASTNode* condition, ASTNode* body) {
     ASTNode* node = create_node(NODE_WHILE);
@@ -103,6 +120,15 @@ ASTNode* create_for_node(char* variable, ASTNode* start, ASTNode* end, ASTNode* 
     return node;
 }
 
+/* 创建 for each 节点 */
+ASTNode* create_for_each_node(char* variable, ASTNode* set, ASTNode* body) {
+    ASTNode* node = create_node(NODE_FOR_EACH);
+    node->data.for_each_stmt.variable = strdup(variable);
+    node->data.for_each_stmt.set = set;
+    node->data.for_each_stmt.body = body;
+    return node;
+}
+
 /* 创建 return 节点 */
 ASTNode* create_return_node(ASTNode* value) {
     ASTNode* node = create_node(NODE_RETURN);
@@ -114,6 +140,59 @@ ASTNode* create_return_node(ASTNode* value) {
 ASTNode* create_write_node(ASTNode* expression) {
     ASTNode* node = create_node(NODE_WRITE);
     node->data.write_stmt.expression = expression;
+    return node;
+}
+
+/* 创建 write to file 节点 */
+ASTNode* create_write_to_file_node(ASTNode* expression, char* filename) {
+    ASTNode* node = create_node(NODE_WRITE_TO_FILE);
+    node->data.write_to_file_stmt.expression = expression;
+    node->data.write_to_file_stmt.filename = strdup(filename);
+    return node;
+}
+
+/* 创建 open file 节点 */
+ASTNode* create_open_file_node(char* filename, int file_id) {
+    ASTNode* node = create_node(NODE_OPEN_FILE);
+    node->data.open_file_stmt.filename = strdup(filename);
+    node->data.open_file_stmt.file_id = file_id;
+    return node;
+}
+
+/* 创建 close file 节点 */
+ASTNode* create_close_file_node(int file_id) {
+    ASTNode* node = create_node(NODE_CLOSE_FILE);
+    node->data.close_file_stmt.file_id = file_id;
+    return node;
+}
+
+/* 创建 read from file 节点 */
+ASTNode* create_read_from_file_node(char* variable, int file_id) {
+    ASTNode* node = create_node(NODE_READ_FROM_FILE);
+    node->data.read_from_file_stmt.variable = strdup(variable);
+    node->data.read_from_file_stmt.file_id = file_id;
+    return node;
+}
+
+/* 创建 start simulation 节点 */
+ASTNode* create_start_simulation_node() {
+    ASTNode* node = create_node(NODE_START_SIMULATION);
+    return node;
+}
+
+/* 创建 schedule 节点 */
+ASTNode* create_schedule_node(char* event_name, ASTNode* time, ASTNode* parameters) {
+    ASTNode* node = create_node(NODE_SCHEDULE);
+    node->data.schedule_stmt.event_name = strdup(event_name);
+    node->data.schedule_stmt.time = time;
+    node->data.schedule_stmt.parameters = parameters;
+    return node;
+}
+
+/* 创建 advance time 节点 */
+ASTNode* create_advance_time_node(ASTNode* delta_time) {
+    ASTNode* node = create_node(NODE_ADVANCE_TIME);
+    node->data.advance_time_stmt.delta_time = delta_time;
     return node;
 }
 
