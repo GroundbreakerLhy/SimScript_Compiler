@@ -34,11 +34,11 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")
 # 包含目录
 include_directories(${CMAKE_SOURCE_DIR}/src)
 include_directories(${CMAKE_SOURCE_DIR}/src/frontend)
-include_directories(${CMAKE_BINARY_DIR}/src/frontend)
+include_directories(${CMAKE_BINARY_DIR})
 
 # 使用 Flex 和 Bison 生成词法分析器和语法分析器
-FLEX_TARGET(SimScriptLexer src/frontend/lexer.l ${CMAKE_BINARY_DIR}/src/frontend/lexer.c)
-BISON_TARGET(SimScriptParser src/frontend/parser.y ${CMAKE_BINARY_DIR}/src/frontend/parser.c)
+FLEX_TARGET(SimScriptLexer src/frontend/lexer.l ${CMAKE_BINARY_DIR}/lexer.c)
+BISON_TARGET(SimScriptParser src/frontend/parser.y ${CMAKE_BINARY_DIR}/parser.c DEFINES_FILE ${CMAKE_BINARY_DIR}/parser.h)
 ADD_FLEX_BISON_DEPENDENCY(SimScriptLexer SimScriptParser)
 
 # 源文件
