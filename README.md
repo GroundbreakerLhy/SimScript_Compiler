@@ -54,8 +54,8 @@ test.sh                  # 测试脚本
 # Ubuntu/Debian
 sudo apt-get install flex bison llvm-14-dev cmake build-essential
 
-# CentOS/RHEL
-sudo yum install flex bison llvm-devel cmake gcc-c++
+# macOS
+brew install flex bison llvm@16 cmake
 ```
 
 ### 编译流程
