@@ -83,7 +83,11 @@ typedef enum {
     NODE_PARAMETER,
     NODE_EXPRESSION_LIST,
     NODE_SET_CREATION,
-    NODE_SET_OPERATION
+    NODE_SET_OPERATION,
+    NODE_CLASS_DECLARATION,
+    NODE_METHOD_DECLARATION,
+    NODE_OBJECT_CREATION,
+    NODE_METHOD_CALL
 } NodeType;
 
 /* 前向声明 */
@@ -102,7 +106,7 @@ struct ASTNode {
         } program;
         
         struct {
-            ASTNode* statements;
+            ASTNode** items;
             int count;
             int capacity;
         } statement_list;
@@ -258,6 +262,32 @@ struct ASTNode {
             ASTNode* left;
             ASTNode* right;
         } set_operation;
+        
+        struct {
+            char* name;
+            char* parent_class;
+            ASTNode* members;
+        } class_declaration;
+        
+        struct {
+            char* name;
+            ASTNode* parameters;
+            DataType return_type;
+            ASTNode* body;
+            int is_override;
+        } method_declaration;
+        
+        struct {
+            char* variable_name;
+            char* class_name;
+            ASTNode* arguments;
+        } object_creation;
+        
+        struct {
+            char* object_name;
+            char* method_name;
+            ASTNode* arguments;
+        } method_call;
     } data;
 };
 
@@ -297,6 +327,10 @@ ASTNode* create_parameter_node(char* name, DataType type);
 ASTNode* create_expression_list_node();
 ASTNode* create_set_creation_node(ASTNode* elements);
 ASTNode* create_set_operation_node(SetOperationType op, ASTNode* left, ASTNode* right);
+ASTNode* create_class_declaration_node(char* name, char* parent_class, ASTNode* members);
+ASTNode* create_method_declaration_node(char* name, ASTNode* parameters, DataType return_type, ASTNode* body, int is_override);
+ASTNode* create_object_creation_node(char* variable_name, char* class_name, ASTNode* arguments);
+ASTNode* create_method_call_node(char* object_name, char* method_name, ASTNode* arguments);
 
 /* 列表操作函数 */
 void add_statement_to_list(ASTNode* list, ASTNode* statement);
@@ -327,6 +361,10 @@ typedef struct {
     void (*visit_function_call)(ASTNode* node, void* context);
     void (*visit_set_creation)(ASTNode* node, void* context);
     void (*visit_set_operation)(ASTNode* node, void* context);
+    void (*visit_class_declaration)(ASTNode* node, void* context);
+    void (*visit_method_declaration)(ASTNode* node, void* context);
+    void (*visit_object_creation)(ASTNode* node, void* context);
+    void (*visit_method_call)(ASTNode* node, void* context);
 } ASTVisitor;
 
 /* AST 遍历函数 */

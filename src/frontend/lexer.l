@@ -49,6 +49,7 @@ WHITESPACE  [ \t]+
 "TEXT"              { return TEXT; }
 "ALPHA"             { return ALPHA; }
 "SET"               { return SET; }
+"VOID"              { return VOID; }
 "IF"                { return IF; }
 "THEN"              { return THEN; }
 "ELSE"              { return ELSE; }
@@ -62,6 +63,9 @@ WHITESPACE  [ \t]+
 "WHILE"             { return WHILE; }
 "EACH"              { return EACH; }
 "IN"                { return IN; }
+"INHERITS"          { return INHERITS; }
+"NEW"               { return NEW; }
+"OVERRIDE"          { return OVERRIDE; }
 "ROUTINE"           { return ROUTINE; }
 "RETURN"            { return RETURN; }
 "LET"               { return LET; }
@@ -73,10 +77,13 @@ WHITESPACE  [ \t]+
 "SCREEN"            { return SCREEN; }
 "OPEN"              { return OPEN; }
 "CLOSE"             { return CLOSE; }
+"CLASS"             { return CLASS; }
 "FILE"              { return FILE_KW; }
 "START"             { return START; }
 "SIMULATION"        { return SIMULATION; }
 "SCHEDULE"          { return SCHEDULE; }
+"SUPER"             { return SUPER; }
+"THIS"              { return THIS; }
 "TIME"              { return TIME; }
 "ADVANCE"           { return ADVANCE; }
 "BY"                { return BY; }

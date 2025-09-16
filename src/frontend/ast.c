@@ -26,7 +26,7 @@ ASTNode* create_program_node(ASTNode* preamble, ASTNode* main) {
 /* 创建语句列表节点 */
 ASTNode* create_statement_list_node() {
     ASTNode* node = create_node(NODE_STATEMENT_LIST);
-    node->data.statement_list.statements = NULL;
+    node->data.statement_list.items = NULL;
     node->data.statement_list.count = 0;
     node->data.statement_list.capacity = 0;
     return node;
@@ -437,6 +437,18 @@ void ast_visit(ASTNode* node, ASTVisitor* visitor, void* context) {
         case NODE_SET_OPERATION:
             if (visitor->visit_set_operation) visitor->visit_set_operation(node, context);
             break;
+        case NODE_CLASS_DECLARATION:
+            if (visitor->visit_class_declaration) visitor->visit_class_declaration(node, context);
+            break;
+        case NODE_METHOD_DECLARATION:
+            if (visitor->visit_method_declaration) visitor->visit_method_declaration(node, context);
+            break;
+        case NODE_OBJECT_CREATION:
+            if (visitor->visit_object_creation) visitor->visit_object_creation(node, context);
+            break;
+        case NODE_METHOD_CALL:
+            if (visitor->visit_method_call) visitor->visit_method_call(node, context);
+            break;
         default:
             break;
     }
@@ -582,8 +594,83 @@ void print_ast_tree(ASTNode* node, int indent) {
             print_ast_tree(node->data.binary_expression.left, indent + 1);
             print_ast_tree(node->data.binary_expression.right, indent + 1);
             break;
+        case NODE_CLASS_DECLARATION:
+            printf("ClassDeclaration: %s", node->data.class_declaration.name);
+            if (node->data.class_declaration.parent_class) {
+                printf(" inherits %s", node->data.class_declaration.parent_class);
+            }
+            printf("\n");
+            if (node->data.class_declaration.members) {
+                print_ast_tree(node->data.class_declaration.members, indent + 1);
+            }
+            break;
+        case NODE_METHOD_DECLARATION:
+            printf("MethodDeclaration: %s%s\n", 
+                   node->data.method_declaration.is_override ? "override " : "",
+                   node->data.method_declaration.name);
+            if (node->data.method_declaration.parameters) {
+                print_ast_tree(node->data.method_declaration.parameters, indent + 1);
+            }
+            if (node->data.method_declaration.body) {
+                print_ast_tree(node->data.method_declaration.body, indent + 1);
+            }
+            break;
+        case NODE_OBJECT_CREATION:
+            printf("ObjectCreation: %s = new %s\n", 
+                   node->data.object_creation.variable_name,
+                   node->data.object_creation.class_name);
+            if (node->data.object_creation.arguments) {
+                print_ast_tree(node->data.object_creation.arguments, indent + 1);
+            }
+            break;
+        case NODE_METHOD_CALL:
+            printf("MethodCall: %s.%s\n", 
+                   node->data.method_call.object_name,
+                   node->data.method_call.method_name);
+            if (node->data.method_call.arguments) {
+                print_ast_tree(node->data.method_call.arguments, indent + 1);
+            }
+            break;
         default:
             printf("Node type: %d\n", node->type);
             break;
     }
+}
+
+/* 创建类声明节点 */
+ASTNode* create_class_declaration_node(char* name, char* parent_class, ASTNode* members) {
+    ASTNode* node = create_node(NODE_CLASS_DECLARATION);
+    node->data.class_declaration.name = strdup(name);
+    node->data.class_declaration.parent_class = parent_class ? strdup(parent_class) : NULL;
+    node->data.class_declaration.members = members;
+    return node;
+}
+
+/* 创建方法声明节点 */
+ASTNode* create_method_declaration_node(char* name, ASTNode* parameters, DataType return_type, ASTNode* body, int is_override) {
+    ASTNode* node = create_node(NODE_METHOD_DECLARATION);
+    node->data.method_declaration.name = strdup(name);
+    node->data.method_declaration.parameters = parameters;
+    node->data.method_declaration.return_type = return_type;
+    node->data.method_declaration.body = body;
+    node->data.method_declaration.is_override = is_override;
+    return node;
+}
+
+/* 创建对象创建节点 */
+ASTNode* create_object_creation_node(char* variable_name, char* class_name, ASTNode* arguments) {
+    ASTNode* node = create_node(NODE_OBJECT_CREATION);
+    node->data.object_creation.variable_name = strdup(variable_name);
+    node->data.object_creation.class_name = strdup(class_name);
+    node->data.object_creation.arguments = arguments;
+    return node;
+}
+
+/* 创建方法调用节点 */
+ASTNode* create_method_call_node(char* object_name, char* method_name, ASTNode* arguments) {
+    ASTNode* node = create_node(NODE_METHOD_CALL);
+    node->data.method_call.object_name = strdup(object_name);
+    node->data.method_call.method_name = strdup(method_name);
+    node->data.method_call.arguments = arguments;
+    return node;
 }

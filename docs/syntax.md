@@ -48,6 +48,51 @@ EVENT event_name                # 事件定义
 END
 ```
 
+## 面向对象编程
+
+### 类定义
+```simscript
+CLASS class_name
+    # 成员变量声明
+    DEFINE member_var AS type
+    
+    # 方法定义
+    ROUTINE method_name(param: type) = return_type
+        statements
+        RETURN expression
+    END
+    
+    # 方法重写
+    OVERRIDE ROUTINE method_name(param: type) = return_type
+        statements
+    END
+END
+```
+
+### 继承
+```simscript
+CLASS child_class INHERITS parent_class
+    # 继承父类的所有成员和方法
+    # 可以添加新的成员和方法
+    # 可以重写父类方法
+END
+```
+
+### 对象操作
+```simscript
+# 对象创建
+LET object_var = NEW class_name(arguments)
+
+# 方法调用
+object_var.method_name(arguments)
+
+# 当前对象方法调用 (在类方法内部)
+THIS.method_name(arguments)
+
+# 父类方法调用
+SUPER.method_name(arguments)
+```
+
 ## 运算符
 
 ### 算术运算

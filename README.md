@@ -82,27 +82,9 @@ gcc -no-pie output.s -o executable
 
 ### 调试选项
 ```bash
-./build/simscript_compiler input.sim --print-ast    # 输出语法树
-./build/simscript_compiler input.sim --print-ir     # 输出LLVM IR
+./build/simscript_compiler input.sim --print-ast 
+./build/simscript_compiler input.sim --print-ir
 ```
-
-### 测试验证
-```bash
-./test.sh    # 运行完整测试套件
-```
-
-## 实现状态
-
-| 功能模块 | 状态 | 备注 |
-|----------|------|------|
-| 词法语法分析 | ✓ | 完整支持SIMSCRIPT语法 |
-| 类型系统 | ✓ | 支持基本类型与自动推断 |
-| 控制流语句 | ✓ | IF/WHILE/FOR/ELSEIF |
-| 函数系统 | ✓ | 定义、调用、参数传递 |
-| 实体事件 | ✓ | 语法解析完成 |
-| 仿真控制 | ✓ | 语法解析完成 |
-| 文件I/O | ✓ | 语法解析完成 |
-| 运行时库 | ○ | 仿真引擎待实现 |
 
 ## 技术文档
 

@@ -105,7 +105,7 @@ main() {
     echo "Compiler executable: $(pwd)/simscript_compiler"
     echo ""
     echo "Usage:"
-    echo "  ./simscript_compiler input.sim -o output.ll"
+    echo "  ./build/simscript_compiler input.sim -o output.ll"
     echo "  llc output.ll -o output.s"
     echo "  gcc output.s -o executable"
 }

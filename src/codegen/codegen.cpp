@@ -614,6 +614,93 @@ static void codegen_statement(CodeGenerator* codegen, ASTNode* node) {
             fprintf(stderr, "Info: ADVANCE TIME\n");
             break;
         }
+        
+        case NODE_CLASS_DECLARATION: {
+            // 处理类声明
+            const char* class_name = node->data.class_declaration.name;
+            const char* parent_class = node->data.class_declaration.parent_class;
+            ASTNode* members = node->data.class_declaration.members;
+            
+            // 添加类到符号表
+            if (!symbol_table_add_class(codegen->symbol_table, class_name, parent_class)) {
+                fprintf(stderr, "Error: Class '%s' already declared\n", class_name);
+                return;
+            }
+            
+            // 处理类成员（变量和方法）
+            if (members && members->type == NODE_STATEMENT_LIST) {
+                for (int i = 0; i < members->data.statement_list.count; i++) {
+                    ASTNode* member = members->data.statement_list.items[i];
+                    if (member->type == NODE_VARIABLE_DECLARATION) {
+                        // 添加成员变量
+                        Symbol* class_symbol = symbol_table_lookup(codegen->symbol_table, class_name);
+                        SymbolTable* member_table = (SymbolTable*)class_symbol->members;
+                        symbol_table_add_member(member_table, 
+                                               member->data.variable_declaration.name,
+                                               member->data.variable_declaration.type);
+                    } else if (member->type == NODE_METHOD_DECLARATION) {
+                        // 添加方法
+                        Symbol* class_symbol = symbol_table_lookup(codegen->symbol_table, class_name);
+                        SymbolTable* method_table = (SymbolTable*)class_symbol->methods;
+                        symbol_table_add_method(method_table,
+                                               member->data.method_declaration.name,
+                                               member->data.method_declaration.return_type,
+                                               member->data.method_declaration.parameters,
+                                               member->data.method_declaration.is_override);
+                    }
+                }
+            }
+            break;
+        }
+        
+        case NODE_OBJECT_CREATION: {
+            // 处理对象创建
+            const char* var_name = node->data.object_creation.variable_name;
+            const char* class_name = node->data.object_creation.class_name;
+            ASTNode* arguments = node->data.object_creation.arguments;
+            
+            // 查找类
+            Symbol* class_symbol = symbol_table_lookup(codegen->symbol_table, class_name);
+            if (!class_symbol) {
+                fprintf(stderr, "Error: Class '%s' not found\n", class_name);
+                return;
+            }
+            
+            // 创建对象（简化实现：使用结构体指针）
+            // 这里需要更复杂的实现来处理构造函数调用
+            // 暂时只创建变量声明
+            if (!symbol_table_add(codegen->symbol_table, var_name, TYPE_VOID)) {
+                fprintf(stderr, "Error: Variable '%s' already declared\n", var_name);
+                return;
+            }
+            
+            Symbol* var_symbol = symbol_table_lookup(codegen->symbol_table, var_name);
+            // 分配内存（简化）
+            LLVMTypeRef void_ptr_type = LLVMPointerType(LLVMInt8TypeInContext(codegen->context), 0);
+            LLVMValueRef alloca = LLVMBuildAlloca(codegen->builder, void_ptr_type, var_name);
+            symbol_table_set_value(var_symbol, alloca);
+            
+            break;
+        }
+        
+        case NODE_METHOD_CALL: {
+            // 处理方法调用
+            const char* object_name = node->data.method_call.object_name;
+            const char* method_name = node->data.method_call.method_name;
+            ASTNode* arguments = node->data.method_call.arguments;
+            
+            // 查找对象
+            Symbol* object_symbol = symbol_table_lookup(codegen->symbol_table, object_name);
+            if (!object_symbol) {
+                fprintf(stderr, "Error: Object '%s' not found\n", object_name);
+                return;
+            }
+            
+            // 这里需要实现方法查找和调用
+            // 暂时跳过，等待更完整的实现
+            fprintf(stderr, "Info: Method call %s.%s\n", object_name, method_name);
+            break;
+        }
             
         default:
             break;
@@ -744,8 +831,9 @@ int codegen_generate(CodeGenerator* codegen, ASTNode* ast) {
                     if (decl->type == NODE_FUNCTION_DECLARATION) {
                         codegen_function(codegen, decl);
                     } else if (decl->type == NODE_ENTITY_DECLARATION || 
-                              decl->type == NODE_EVENT_DECLARATION) {
-                        // 处理实体和事件声明
+                              decl->type == NODE_EVENT_DECLARATION ||
+                              decl->type == NODE_CLASS_DECLARATION) {
+                        // 处理实体、事件和类声明
                         codegen_statement(codegen, decl);
                     }
                 }

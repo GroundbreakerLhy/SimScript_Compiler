@@ -29,12 +29,13 @@ ASTNode* root = NULL;
 %token <ival> INTEGER_LITERAL
 %token <fval> FLOAT_LITERAL
 %token <sval> STRING_LITERAL IDENTIFIER
-%token <dtype> INT REAL DOUBLE TEXT ALPHA SET
+%token <dtype> INT REAL DOUBLE TEXT ALPHA SET VOID
 
 %token PREAMBLE END MAIN DEFINE ENTITY EVENT ATTRIBUTES PARAMETERS AS
 %token IF THEN ELSE ELSEIF ALWAYS FOR TO STEP DO LOOP WHILE EACH IN
 %token ROUTINE RETURN LET AND OR NOT WRITE READ_KW SCREEN ADD REMOVE FROM
 %token OPEN CLOSE FILE_KW START SIMULATION SCHEDULE TIME ADVANCE BY AT WITH
+%token CLASS INHERITS OVERRIDE SUPER THIS NEW
 %token ASSIGN PLUS MINUS MULTIPLY DIVIDE POWER
 %token EQ NE LT GT LE GE
 %token LPAREN RPAREN COMMA COLON SEMICOLON DOT NEWLINE
@@ -42,9 +43,11 @@ ASTNode* root = NULL;
 /* 非终结符 */
 %type <node> program preamble main_section
 %type <node> declaration_list declaration variable_declaration entity_declaration event_declaration function_declaration
+%type <node> class_declaration class_body class_member_list class_member method_declaration
 %type <node> statement_list statement assignment_statement if_statement elseif_list while_statement for_statement return_statement write_statement
 %type <node> file_statement open_statement close_statement read_statement
 %type <node> simulation_statement start_simulation_statement schedule_statement advance_time_statement
+%type <node> object_creation_statement method_call_statement
 %type <node> expression primary_expression binary_expression unary_expression function_call expression_list
 %type <node> set_expression
 %type <node> attribute_list attribute parameter_list parameter
@@ -103,6 +106,7 @@ declaration:
     | entity_declaration newlines { $$ = $1; }
     | event_declaration newlines { $$ = $1; }
     | function_declaration newlines { $$ = $1; }
+    | class_declaration newlines { $$ = $1; }
     ;
 
 variable_declaration:
@@ -132,6 +136,50 @@ function_declaration:
     }
     | ROUTINE IDENTIFIER LPAREN RPAREN ASSIGN type newlines statement_list END {
         $$ = create_function_declaration_node($2, NULL, $6, $8);
+    }
+    ;
+
+class_declaration:
+    CLASS IDENTIFIER newlines class_body END {
+        $$ = create_class_declaration_node($2, NULL, $4);
+    }
+    | CLASS IDENTIFIER INHERITS IDENTIFIER newlines class_body END {
+        $$ = create_class_declaration_node($2, $4, $6);
+    }
+    ;
+
+class_body:
+    class_member_list { $$ = $1; }
+    ;
+
+class_member_list:
+    class_member {
+        $$ = create_statement_list_node();
+        add_statement_to_list($$, $1);
+    }
+    | class_member_list class_member {
+        add_statement_to_list($1, $2);
+        $$ = $1;
+    }
+    ;
+
+class_member:
+    variable_declaration newlines { $$ = $1; }
+    | method_declaration newlines { $$ = $1; }
+    ;
+
+method_declaration:
+    ROUTINE IDENTIFIER LPAREN parameter_list RPAREN ASSIGN type newlines statement_list END {
+        $$ = create_method_declaration_node($2, $4, $7, $9, 0);
+    }
+    | OVERRIDE ROUTINE IDENTIFIER LPAREN parameter_list RPAREN ASSIGN type newlines statement_list END {
+        $$ = create_method_declaration_node($3, $5, $8, $10, 1);
+    }
+    | ROUTINE IDENTIFIER LPAREN RPAREN ASSIGN type newlines statement_list END {
+        $$ = create_method_declaration_node($2, NULL, $6, $8, 0);
+    }
+    | OVERRIDE ROUTINE IDENTIFIER LPAREN RPAREN ASSIGN type newlines statement_list END {
+        $$ = create_method_declaration_node($3, NULL, $7, $9, 1);
     }
     ;
 
@@ -201,6 +249,8 @@ statement:
     | write_statement newlines { $$ = $1; }
     | file_statement newlines { $$ = $1; }
     | simulation_statement newlines { $$ = $1; }
+    | object_creation_statement newlines { $$ = $1; }
+    | method_call_statement newlines { $$ = $1; }
     ;
 
 assignment_statement:
@@ -411,6 +461,36 @@ function_call:
     }
     ;
 
+object_creation_statement:
+    LET IDENTIFIER ASSIGN NEW IDENTIFIER LPAREN expression_list RPAREN {
+        $$ = create_object_creation_node($2, $5, $7);
+    }
+    | LET IDENTIFIER ASSIGN NEW IDENTIFIER LPAREN RPAREN {
+        $$ = create_object_creation_node($2, $5, NULL);
+    }
+    ;
+
+method_call_statement:
+    IDENTIFIER DOT IDENTIFIER LPAREN expression_list RPAREN {
+        $$ = create_method_call_node($1, $3, $5);
+    }
+    | IDENTIFIER DOT IDENTIFIER LPAREN RPAREN {
+        $$ = create_method_call_node($1, $3, NULL);
+    }
+    | THIS DOT IDENTIFIER LPAREN expression_list RPAREN {
+        $$ = create_method_call_node("this", $3, $5);
+    }
+    | THIS DOT IDENTIFIER LPAREN RPAREN {
+        $$ = create_method_call_node("this", $3, NULL);
+    }
+    | SUPER DOT IDENTIFIER LPAREN expression_list RPAREN {
+        $$ = create_method_call_node("super", $3, $5);
+    }
+    | SUPER DOT IDENTIFIER LPAREN RPAREN {
+        $$ = create_method_call_node("super", $3, NULL);
+    }
+    ;
+
 expression_list:
     expression {
         $$ = create_expression_list_node();
@@ -448,6 +528,7 @@ type:
     | TEXT { $$ = TYPE_TEXT; }
     | ALPHA { $$ = TYPE_ALPHA; }
     | SET { $$ = TYPE_SET; }
+    | VOID { $$ = TYPE_VOID; }
     ;
 
 newlines:

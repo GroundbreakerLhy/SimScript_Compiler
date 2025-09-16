@@ -5,18 +5,18 @@
 ### 前端分析器
 | 组件 | 状态 | 实现技术 |
 |------|------|----------|
-| 词法分析器 | ✓ | Flex 2.6+ |
-| 语法分析器 | ✓ | Bison 3.0+ |
-| 抽象语法树 | ✓ | C语言实现 |
-| 符号表管理 | ✓ | 作用域支持 |
+| 词法分析器 | 已实现 | Flex 2.6+ |
+| 语法分析器 | 已实现 | Bison 3.0+ |
+| 抽象语法树 | 已实现 | C语言实现 |
+| 符号表管理 | 已实现 | 作用域支持 |
 
 ### 后端代码生成
 | 组件 | 状态 | 实现技术 |
 |------|------|----------|
-| IR生成器 | ✓ | LLVM C API |
-| 类型映射 | ✓ | SIMSCRIPT→LLVM |
-| 控制流构建 | ✓ | 基本块管理 |
-| 函数生成 | ✓ | 调用约定 |
+| IR生成器 | 已实现 | LLVM C API |
+| 类型映射 | 已实现 | SIMSCRIPT→LLVM |
+| 控制流构建 | 已实现 | 基本块管理 |
+| 函数生成 | 已实现 | 调用约定 |
 
 ## 语言特性实现
 
@@ -27,7 +27,7 @@ DEFINE var_real AS REAL         # 双精度浮点
 DEFINE var_text AS TEXT         # 字符串类型
 DEFINE var_set AS SET           # 集合类型
 ```
-**状态**: ✓ 完整实现，支持自动类型推断
+**状态**: 已实现，支持自动类型推断
 
 ### 程序结构
 ```simscript
@@ -43,7 +43,7 @@ MAIN                           # 主程序段
     Control flow statements
 END MAIN
 ```
-**状态**: ✓ 完整支持
+**状态**: 已实现
 
 ### 控制流语句
 ```simscript
@@ -67,7 +67,7 @@ FOR EACH element IN set DO      # 集合迭代
     statements
 LOOP
 ```
-**状态**: ✓ 语法解析与代码生成完整
+**状态**: 语法解析与代码生成完整
 
 ### 函数系统
 ```simscript
@@ -76,7 +76,7 @@ ROUTINE function_name(param: type) = return_type
     RETURN expression
 END
 ```
-**状态**: ✓ 支持参数传递、类型检查、递归调用
+**状态**: 支持参数传递、类型检查、递归调用
 
 ### 数据结构定义
 ```simscript
@@ -92,7 +92,34 @@ EVENT event_name                # 事件定义
         param2: type
 END
 ```
-**状态**: ✓ 语法解析完成，结构体生成支持
+**状态**: 语法解析完成，结构体生成支持
+
+### 面向对象编程 (OOP)
+```simscript
+CLASS class_name
+    DEFINE member_var AS type
+    
+    ROUTINE method_name(param: type) = return_type  # 方法定义
+        statements
+    END
+    
+    OVERRIDE ROUTINE method_name(param: type) = return_type  # 方法重写
+        statements
+    END
+END
+
+CLASS child_class INHERITS parent_class  # 继承
+    # 继承父类的成员和方法
+END
+
+MAIN
+    LET obj = NEW class_name()    # 对象创建
+    obj.method_name(args)         # 方法调用
+    THIS.method()                 # 当前对象方法调用
+    SUPER.method()                # 父类方法调用
+END MAIN
+```
+**状态**: 语法解析、AST构建和基础代码生成完成，运行时对象创建支持
 
 ### 仿真控制语句
 ```simscript
@@ -100,7 +127,7 @@ START SIMULATION                # 仿真初始化
 SCHEDULE event_name AT time     # 事件调度
 ADVANCE TIME BY delta           # 时间推进
 ```
-**状态**: ✓ 语法解析完成，运行时引擎待实现
+**状态**: 语法解析完成，运行时引擎待实现
 
 ### 文件I/O操作
 ```simscript
@@ -109,21 +136,21 @@ WRITE expression TO FILE "name" # 文件写入
 READ variable FROM FILE 1       # 文件读取
 CLOSE FILE 1                    # 文件关闭
 ```
-**状态**: ✓ 语法解析完成，系统调用接口待实现
+**状态**: 语法解析完成，系统调用接口待实现
 
 ## 测试覆盖
 
 ### 功能测试
 | 测试模块 | 状态 | 覆盖范围 |
 |----------|------|----------|
-| 基础语法 | ✓ | 变量、表达式、输出 |
-| 数学运算 | ✓ | 四则运算、优先级 |
-| 控制流 | ✓ | IF/WHILE/FOR/ELSEIF |
-| 函数调用 | ✓ | 定义、调用、参数 |
-| 类型系统 | ✓ | 多类型变量处理 |
-| 注释支持 | ✓ | 单行注释解析 |
-| 程序结构 | ✓ | PREAMBLE/MAIN |
-| 高级语法 | ✓ | 实体、事件、仿真 |
+| 基础语法 | 已实现 | 变量、表达式、输出 |
+| 数学运算 | 已实现 | 四则运算、优先级 |
+| 控制流 | 已实现 | IF/WHILE/FOR/ELSEIF |
+| 函数调用 | 已实现 | 定义、调用、参数 |
+| 类型系统 | 已实现 | 多类型变量处理 |
+| 注释支持 | 已实现 | 单行注释解析 |
+| 程序结构 | 已实现 | PREAMBLE/MAIN |
+| 高级语法 | 已实现 | 实体、事件、仿真 |
 
 ## 技术架构特性
 

@@ -141,6 +141,90 @@ int symbol_table_add_function(SymbolTable* table, const char* name, DataType ret
     return 1;
 }
 
+/* Add class to table */
+int symbol_table_add_class(SymbolTable* table, const char* name, const char* parent_class) {
+    if (!table || !name) return 0;
+    
+    // Check if symbol already exists
+    if (symbol_table_lookup(table, name)) {
+        return 0; // Symbol already exists
+    }
+    
+    if (table->count >= table->capacity) {
+        expand_table(table);
+    }
+    
+    Symbol* symbol = &table->symbols[table->count];
+    symbol->name = strdup(name);
+    symbol->type = TYPE_VOID; // Classes don't have a specific type
+    symbol->is_initialized = 1;
+    symbol->llvm_value = NULL;
+    symbol->attributes = NULL;
+    symbol->parameters = NULL;
+    symbol->parent_class = parent_class ? strdup(parent_class) : NULL;
+    symbol->methods = symbol_table_create(); // Create method table
+    symbol->members = symbol_table_create(); // Create member table
+    
+    table->count++;
+    return 1;
+}
+
+/* Add method to class */
+int symbol_table_add_method(SymbolTable* class_table, const char* name, DataType return_type, void* parameters, int is_override) {
+    if (!class_table || !name) return 0;
+    
+    // Check if method already exists
+    if (symbol_table_lookup(class_table, name)) {
+        return 0; // Method already exists
+    }
+    
+    if (class_table->count >= class_table->capacity) {
+        expand_table(class_table);
+    }
+    
+    Symbol* symbol = &class_table->symbols[class_table->count];
+    symbol->name = strdup(name);
+    symbol->type = return_type;
+    symbol->is_initialized = 1;
+    symbol->llvm_value = NULL;
+    symbol->attributes = NULL;
+    symbol->parameters = parameters;
+    symbol->parent_class = NULL;
+    symbol->methods = NULL;
+    symbol->members = NULL;
+    
+    class_table->count++;
+    return 1;
+}
+
+/* Add member to class */
+int symbol_table_add_member(SymbolTable* class_table, const char* name, DataType type) {
+    if (!class_table || !name) return 0;
+    
+    // Check if member already exists
+    if (symbol_table_lookup(class_table, name)) {
+        return 0; // Member already exists
+    }
+    
+    if (class_table->count >= class_table->capacity) {
+        expand_table(class_table);
+    }
+    
+    Symbol* symbol = &class_table->symbols[class_table->count];
+    symbol->name = strdup(name);
+    symbol->type = type;
+    symbol->is_initialized = 0;
+    symbol->llvm_value = NULL;
+    symbol->attributes = NULL;
+    symbol->parameters = NULL;
+    symbol->parent_class = NULL;
+    symbol->methods = NULL;
+    symbol->members = NULL;
+    
+    class_table->count++;
+    return 1;
+}
+
 /* Look up symbol in table */
 Symbol* symbol_table_lookup(SymbolTable* table, const char* name) {
     if (!table || !name) return NULL;
