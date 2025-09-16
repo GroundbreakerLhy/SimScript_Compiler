@@ -1,4 +1,6 @@
 build/
 tests/
 *.ll
+*.s
+test.sh
 .DS_Store
