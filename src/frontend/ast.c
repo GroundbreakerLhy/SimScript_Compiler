@@ -249,6 +249,14 @@ ASTNode* create_function_call_node(char* name, ASTNode* arguments) {
     return node;
 }
 
+/* 创建标准库函数调用节点 */
+ASTNode* create_stdlib_function_call_node(char* name, ASTNode* arguments) {
+    ASTNode* node = create_node(NODE_STDLIB_FUNCTION_CALL);
+    node->data.stdlib_function_call.name = strdup(name);
+    node->data.stdlib_function_call.arguments = arguments;
+    return node;
+}
+
 /* 创建属性列表节点 */
 ASTNode* create_attribute_list_node() {
     ASTNode* node = create_node(NODE_ATTRIBUTE_LIST);

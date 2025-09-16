@@ -25,6 +25,7 @@
 - 表达式：算术运算、逻辑运算、比较运算
 - 输入输出：WRITE TO SCREEN, 文件 I/O 语法
 - 仿真支持：START SIMULATION, SCHEDULE 事件调度
+- 标准库: 随机数生成、统计函数、数据结构、时间模拟
 
 ## 项目结构
 
@@ -72,11 +73,18 @@ make -j$(nproc)
 
 ## 使用说明
 
-### 基本编译
+### 手动编译步骤
 ```bash
 ./build/simscript_compiler input.sim -o output.ll
 llc output.ll -o output.s
-gcc -no-pie output.s -o executable
+gcc -no-pie output.s \
+    src/stdlib/data_structures/set.c \
+    src/stdlib/data_structures/queue.c \
+    src/stdlib/data_structures/resource.c \
+    src/stdlib/math/random.c \
+    src/stdlib/math/statistics.c \
+    src/stdlib/time_simulation/time_simulation.c \
+    -o executable -lm
 ./executable
 ```
 

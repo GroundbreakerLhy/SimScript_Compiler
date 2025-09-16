@@ -37,6 +37,7 @@ ASTNode* root = NULL;
 %token OPEN CLOSE FILE_KW START SIMULATION SCHEDULE TIME ADVANCE BY AT WITH
 %token CLASS INHERITS OVERRIDE SUPER THIS NEW
 %token PARALLEL SECTIONS CRITICAL BARRIER MASTER SINGLE THREADPRIVATE
+%token RANDOM UNIFORM NORMAL EXPONENTIAL POISSON
 %token ASSIGN PLUS MINUS MULTIPLY DIVIDE POWER
 %token EQ NE LT GT LE GE
 %token LPAREN RPAREN COMMA COLON SEMICOLON DOT NEWLINE
@@ -520,6 +521,25 @@ function_call:
     }
     | IDENTIFIER LPAREN RPAREN {
         $$ = create_function_call_node($1, NULL);
+    }
+    /* Standard Library Function Calls */
+    | RANDOM LPAREN expression_list RPAREN {
+        $$ = create_stdlib_function_call_node("random", $3);
+    }
+    | RANDOM LPAREN RPAREN {
+        $$ = create_stdlib_function_call_node("random", NULL);
+    }
+    | UNIFORM LPAREN expression_list RPAREN {
+        $$ = create_stdlib_function_call_node("uniform", $3);
+    }
+    | NORMAL LPAREN expression_list RPAREN {
+        $$ = create_stdlib_function_call_node("normal", $3);
+    }
+    | EXPONENTIAL LPAREN expression_list RPAREN {
+        $$ = create_stdlib_function_call_node("exponential", $3);
+    }
+    | POISSON LPAREN expression_list RPAREN {
+        $$ = create_stdlib_function_call_node("poisson", $3);
     }
     ;
 

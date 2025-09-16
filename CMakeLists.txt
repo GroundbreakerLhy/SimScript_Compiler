@@ -56,6 +56,15 @@ set(CODEGEN_SOURCES
     src/codegen/codegen.cpp
 )
 
+set(STDLIB_SOURCES
+    src/stdlib/data_structures/set.c
+    src/stdlib/data_structures/queue.c
+    src/stdlib/data_structures/resource.c
+    src/stdlib/math/random.c
+    src/stdlib/math/statistics.c
+    src/stdlib/time_simulation/time_simulation.c
+)
+
 set(MAIN_SOURCES
     src/main.cpp
 )
@@ -64,6 +73,7 @@ set(MAIN_SOURCES
 add_executable(simscript_compiler
     ${FRONTEND_SOURCES}
     ${CODEGEN_SOURCES}
+    ${STDLIB_SOURCES}
     ${MAIN_SOURCES}
 )
 

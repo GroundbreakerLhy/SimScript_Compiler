@@ -99,6 +99,11 @@ WHITESPACE  [ \t]+
 "MASTER"            { return MASTER; }
 "SINGLE"            { return SINGLE; }
 "THREADPRIVATE"     { return THREADPRIVATE; }
+"RANDOM"            { return RANDOM; }
+"UNIFORM"           { return UNIFORM; }
+"NORMAL"            { return NORMAL; }
+"EXPONENTIAL"       { return EXPONENTIAL; }
+"POISSON"           { return POISSON; }
 
 "="                 { return ASSIGN; }
 "+"                 { return PLUS; }

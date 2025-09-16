@@ -313,6 +313,112 @@ static LLVMValueRef codegen_expression(CodeGenerator* codegen, ASTNode* node) {
             if (args) free(args);
             return result;
         }
+
+        case NODE_STDLIB_FUNCTION_CALL: {
+            // 处理标准库函数调用
+            const char* func_name = node->data.stdlib_function_call.name;
+
+            // 准备参数
+            LLVMValueRef* args = NULL;
+            int arg_count = 0;
+
+            if (node->data.stdlib_function_call.arguments && node->data.stdlib_function_call.arguments->type == NODE_EXPRESSION_LIST) {
+                arg_count = node->data.stdlib_function_call.arguments->data.list.count;
+                args = (LLVMValueRef*)malloc(arg_count * sizeof(LLVMValueRef));
+
+                for (int i = 0; i < arg_count; i++) {
+                    args[i] = codegen_expression(codegen, node->data.stdlib_function_call.arguments->data.list.items[i]);
+                    if (!args[i]) {
+                        free(args);
+                        return NULL;
+                    }
+                }
+            }
+
+            // 根据函数名生成相应的标准库调用
+            LLVMValueRef result = NULL;
+
+            if (strcmp(func_name, "random") == 0) {
+                // random_uniform_global()
+                LLVMValueRef func = LLVMGetNamedFunction(codegen->module, "random_uniform_global");
+                if (!func) {
+                    // 声明外部函数
+                    LLVMTypeRef ret_type = LLVMDoubleTypeInContext(codegen->context);
+                    LLVMTypeRef func_type = LLVMFunctionType(ret_type, NULL, 0, 0);
+                    func = LLVMAddFunction(codegen->module, "random_uniform_global", func_type);
+                }
+                result = LLVMBuildCall2(codegen->builder, LLVMGetElementType(LLVMTypeOf(func)), func, NULL, 0, "random");
+            }
+            else if (strcmp(func_name, "uniform") == 0 && arg_count == 2) {
+                // random_uniform_int_global(min, max)
+                LLVMValueRef func = LLVMGetNamedFunction(codegen->module, "random_uniform_int_global");
+                if (!func) {
+                    LLVMTypeRef param_types[2] = {LLVMInt32TypeInContext(codegen->context), LLVMInt32TypeInContext(codegen->context)};
+                    LLVMTypeRef ret_type = LLVMInt32TypeInContext(codegen->context);
+                    LLVMTypeRef func_type = LLVMFunctionType(ret_type, param_types, 2, 0);
+                    func = LLVMAddFunction(codegen->module, "random_uniform_int_global", func_type);
+                }
+                result = LLVMBuildCall2(codegen->builder, LLVMGetElementType(LLVMTypeOf(func)), func, args, arg_count, "uniform");
+            }
+            else if (strcmp(func_name, "normal") == 0 && arg_count == 2) {
+                // random_normal_global(mean, stddev)
+                LLVMValueRef func = LLVMGetNamedFunction(codegen->module, "random_normal_global");
+                if (!func) {
+                    LLVMTypeRef param_types[2] = {LLVMDoubleTypeInContext(codegen->context), LLVMDoubleTypeInContext(codegen->context)};
+                    LLVMTypeRef ret_type = LLVMDoubleTypeInContext(codegen->context);
+                    LLVMTypeRef func_type = LLVMFunctionType(ret_type, param_types, 2, 0);
+                    func = LLVMAddFunction(codegen->module, "random_normal_global", func_type);
+                }
+                result = LLVMBuildCall2(codegen->builder, LLVMGetElementType(LLVMTypeOf(func)), func, args, arg_count, "normal");
+            }
+            else if (strcmp(func_name, "exponential") == 0 && arg_count == 1) {
+                // random_exponential_global(rate)
+                LLVMValueRef func = LLVMGetNamedFunction(codegen->module, "random_exponential_global");
+                if (!func) {
+                    LLVMTypeRef param_types[1] = {LLVMDoubleTypeInContext(codegen->context)};
+                    LLVMTypeRef ret_type = LLVMDoubleTypeInContext(codegen->context);
+                    LLVMTypeRef func_type = LLVMFunctionType(ret_type, param_types, 1, 0);
+                    func = LLVMAddFunction(codegen->module, "random_exponential_global", func_type);
+                }
+                result = LLVMBuildCall2(codegen->builder, LLVMGetElementType(LLVMTypeOf(func)), func, args, arg_count, "exponential");
+            }
+            else if (strcmp(func_name, "poisson") == 0 && arg_count == 1) {
+                // random_poisson_global(lambda)
+                LLVMValueRef func = LLVMGetNamedFunction(codegen->module, "random_poisson_global");
+                if (!func) {
+                    LLVMTypeRef param_types[1] = {LLVMDoubleTypeInContext(codegen->context)};
+                    LLVMTypeRef ret_type = LLVMInt32TypeInContext(codegen->context);
+                    LLVMTypeRef func_type = LLVMFunctionType(ret_type, param_types, 1, 0);
+                    func = LLVMAddFunction(codegen->module, "random_poisson_global", func_type);
+                }
+                result = LLVMBuildCall2(codegen->builder, LLVMGetElementType(LLVMTypeOf(func)), func, args, arg_count, "poisson");
+            }
+            else if (strcmp(func_name, "mean") == 0 && arg_count == 1) {
+                // stats_mean(data, n) - 需要特殊处理数组参数
+                fprintf(stderr, "Warning: stats_mean function not fully implemented in codegen\n");
+                result = LLVMConstReal(LLVMDoubleTypeInContext(codegen->context), 0.0);
+            }
+            else if (strcmp(func_name, "seed") == 0 && arg_count == 1) {
+                // random_seed(seed)
+                LLVMValueRef func = LLVMGetNamedFunction(codegen->module, "random_seed");
+                if (!func) {
+                    LLVMTypeRef param_types[1] = {LLVMInt64TypeInContext(codegen->context)};
+                    LLVMTypeRef ret_type = LLVMVoidTypeInContext(codegen->context);
+                    LLVMTypeRef func_type = LLVMFunctionType(ret_type, param_types, 1, 0);
+                    func = LLVMAddFunction(codegen->module, "random_seed", func_type);
+                }
+                result = LLVMBuildCall2(codegen->builder, LLVMGetElementType(LLVMTypeOf(func)), func, args, arg_count, "");
+                // Void function, return NULL
+                result = NULL;
+            }
+            else {
+                fprintf(stderr, "Error: Unknown stdlib function '%s'\n", func_name);
+                result = NULL;
+            }
+
+            if (args) free(args);
+            return result;
+        }
         
         case NODE_SET_CREATION: {
             // 创建集合字面量

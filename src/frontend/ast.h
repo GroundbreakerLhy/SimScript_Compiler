@@ -95,7 +95,8 @@ typedef enum {
     NODE_BARRIER,
     NODE_MASTER,
     NODE_SINGLE,
-    NODE_THREADPRIVATE
+    NODE_THREADPRIVATE,
+    NODE_STDLIB_FUNCTION_CALL
 } NodeType;
 
 /* 前向声明 */
@@ -244,6 +245,11 @@ struct ASTNode {
             char* name;
             ASTNode* arguments;
         } function_call;
+
+        struct {
+            char* name;
+            ASTNode* arguments;
+        } stdlib_function_call;
         
         struct {
             ASTNode** items;
@@ -362,6 +368,7 @@ ASTNode* create_float_literal_node(double value);
 ASTNode* create_string_literal_node(char* value);
 ASTNode* create_identifier_node(char* name);
 ASTNode* create_function_call_node(char* name, ASTNode* arguments);
+ASTNode* create_stdlib_function_call_node(char* name, ASTNode* arguments);
 ASTNode* create_attribute_list_node();
 ASTNode* create_attribute_node(char* name, DataType type);
 ASTNode* create_parameter_list_node();
