@@ -36,6 +36,7 @@ ASTNode* root = NULL;
 %token ROUTINE RETURN LET AND OR NOT WRITE READ_KW SCREEN ADD REMOVE FROM
 %token OPEN CLOSE FILE_KW START SIMULATION SCHEDULE TIME ADVANCE BY AT WITH
 %token CLASS INHERITS OVERRIDE SUPER THIS NEW
+%token PARALLEL SECTIONS CRITICAL BARRIER MASTER SINGLE THREADPRIVATE
 %token ASSIGN PLUS MINUS MULTIPLY DIVIDE POWER
 %token EQ NE LT GT LE GE
 %token LPAREN RPAREN COMMA COLON SEMICOLON DOT NEWLINE
@@ -48,6 +49,7 @@ ASTNode* root = NULL;
 %type <node> file_statement open_statement close_statement read_statement
 %type <node> simulation_statement start_simulation_statement schedule_statement advance_time_statement
 %type <node> object_creation_statement method_call_statement
+%type <node> parallel_statement parallel_sections_statement section_list critical_statement barrier_statement master_statement single_statement threadprivate_statement
 %type <node> expression primary_expression binary_expression unary_expression function_call expression_list
 %type <node> set_expression
 %type <node> attribute_list attribute parameter_list parameter
@@ -246,6 +248,13 @@ statement:
     | while_statement newlines { $$ = $1; }
     | for_statement newlines { $$ = $1; }
     | return_statement newlines { $$ = $1; }
+    | parallel_statement newlines { $$ = $1; }
+    | parallel_sections_statement newlines { $$ = $1; }
+    | critical_statement newlines { $$ = $1; }
+    | barrier_statement newlines { $$ = $1; }
+    | master_statement newlines { $$ = $1; }
+    | single_statement newlines { $$ = $1; }
+    | threadprivate_statement newlines { $$ = $1; }
     | write_statement newlines { $$ = $1; }
     | file_statement newlines { $$ = $1; }
     | simulation_statement newlines { $$ = $1; }
@@ -310,6 +319,59 @@ return_statement:
     }
     | RETURN {
         $$ = create_return_node(NULL);
+    }
+    ;
+
+parallel_statement:
+    PARALLEL DO newlines statement_list LOOP {
+        $$ = create_parallel_node($4);
+    }
+    ;
+
+parallel_sections_statement:
+    PARALLEL SECTIONS newlines section_list LOOP {
+        $$ = create_parallel_sections_node($4);
+    }
+    ;
+
+section_list:
+    SECTIONS newlines statement_list END SECTIONS newlines {
+        $$ = create_section_list_node();
+        copy_statement_list_to_list($$, $3);
+    }
+    | section_list SECTIONS newlines statement_list END SECTIONS newlines {
+        copy_statement_list_to_list($1, $4);
+        $$ = $1;
+    }
+    ;
+
+critical_statement:
+    CRITICAL newlines statement_list END CRITICAL {
+        $$ = create_critical_node($3);
+    }
+    ;
+
+barrier_statement:
+    BARRIER {
+        $$ = create_barrier_node();
+    }
+    ;
+
+master_statement:
+    MASTER newlines statement_list END MASTER {
+        $$ = create_master_node($3);
+    }
+    ;
+
+single_statement:
+    SINGLE newlines statement_list END SINGLE {
+        $$ = create_single_node($3);
+    }
+    ;
+
+threadprivate_statement:
+    THREADPRIVATE IDENTIFIER {
+        $$ = create_threadprivate_node($2);
     }
     ;
 

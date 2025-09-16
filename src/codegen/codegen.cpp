@@ -22,6 +22,61 @@ static LLVMValueRef codegen_expression(CodeGenerator* codegen, ASTNode* node);
 static void codegen_statement(CodeGenerator* codegen, ASTNode* node);
 static void codegen_function(CodeGenerator* codegen, ASTNode* node);
 
+/* 分析循环是否适合OpenMP并行化 */
+static int is_loop_suitable_for_parallelization(ASTNode* loop_body) {
+    if (!loop_body) return 0;
+    
+    // 递归分析循环体
+    switch (loop_body->type) {
+        case NODE_STATEMENT_LIST: {
+            // 检查语句列表中的每个语句
+            for (int i = 0; i < loop_body->data.list.count; i++) {
+                ASTNode* stmt = loop_body->data.list.items[i];
+                
+                // 如果包含文件I/O、屏幕输出或事件调度，不适合并行化
+                if (stmt->type == NODE_WRITE || stmt->type == NODE_WRITE_TO_FILE ||
+                    stmt->type == NODE_OPEN_FILE || stmt->type == NODE_CLOSE_FILE ||
+                    stmt->type == NODE_READ_FROM_FILE || stmt->type == NODE_START_SIMULATION ||
+                    stmt->type == NODE_SCHEDULE || stmt->type == NODE_ADVANCE_TIME) {
+                    return 0; // 不适合并行化
+                }
+                
+                // 如果包含嵌套循环，递归检查
+                if (stmt->type == NODE_FOR || stmt->type == NODE_WHILE || stmt->type == NODE_FOR_EACH) {
+                    if (!is_loop_suitable_for_parallelization(stmt->data.for_stmt.body)) {
+                        return 0;
+                    }
+                }
+                
+                // 如果包含函数调用，需要进一步分析
+                if (stmt->type == NODE_FUNCTION_CALL) {
+                    // 假设大多数函数调用都是计算密集型的，除非是I/O相关的
+                    // 这里可以添加更复杂的分析
+                }
+            }
+            return 1; // 适合并行化
+        }
+        
+        case NODE_ASSIGNMENT:
+        case NODE_BINARY_EXPRESSION:
+        case NODE_UNARY_EXPRESSION:
+            // 纯计算操作，适合并行化
+            return 1;
+            
+        case NODE_IF: {
+            // 条件语句：检查then和else分支
+            int then_suitable = is_loop_suitable_for_parallelization(loop_body->data.if_stmt.then_branch);
+            int else_suitable = loop_body->data.if_stmt.else_branch ? 
+                is_loop_suitable_for_parallelization(loop_body->data.if_stmt.else_branch) : 1;
+            return then_suitable && else_suitable;
+        }
+        
+        default:
+            // 其他类型的语句默认认为不适合并行化，除非经过验证
+            return 0;
+    }
+}
+
 /* 创建代码生成器 */
 CodeGenerator* codegen_create(const char* module_name) {
     CodeGenerator* codegen = (CodeGenerator*)malloc(sizeof(CodeGenerator));
@@ -129,27 +184,81 @@ static LLVMValueRef codegen_expression(CodeGenerator* codegen, ASTNode* node) {
             
             if (!left || !right) return NULL;
             
+            // 检查操作数类型
+            LLVMTypeRef left_type = LLVMTypeOf(left);
+            LLVMTypeRef right_type = LLVMTypeOf(right);
+            
+            // 确保类型匹配
+            if (left_type != right_type) {
+                fprintf(stderr, "Error: Type mismatch in binary expression\n");
+                return NULL;
+            }
+            
+            // 根据类型选择合适的运算指令
+            int is_float = (left_type == LLVMFloatTypeInContext(codegen->context)) ||
+                          (left_type == LLVMDoubleTypeInContext(codegen->context));
+            
             switch (node->data.binary_expression.op) {
                 case BINOP_ADD:
-                    return LLVMBuildAdd(codegen->builder, left, right, "add");
+                    if (is_float) {
+                        return LLVMBuildFAdd(codegen->builder, left, right, "fadd");
+                    } else {
+                        return LLVMBuildAdd(codegen->builder, left, right, "add");
+                    }
                 case BINOP_SUB:
-                    return LLVMBuildSub(codegen->builder, left, right, "sub");
+                    if (is_float) {
+                        return LLVMBuildFSub(codegen->builder, left, right, "fsub");
+                    } else {
+                        return LLVMBuildSub(codegen->builder, left, right, "sub");
+                    }
                 case BINOP_MUL:
-                    return LLVMBuildMul(codegen->builder, left, right, "mul");
+                    if (is_float) {
+                        return LLVMBuildFMul(codegen->builder, left, right, "fmul");
+                    } else {
+                        return LLVMBuildMul(codegen->builder, left, right, "mul");
+                    }
                 case BINOP_DIV:
-                    return LLVMBuildSDiv(codegen->builder, left, right, "div");
+                    if (is_float) {
+                        return LLVMBuildFDiv(codegen->builder, left, right, "fdiv");
+                    } else {
+                        return LLVMBuildSDiv(codegen->builder, left, right, "div");
+                    }
                 case BINOP_EQ:
-                    return LLVMBuildICmp(codegen->builder, LLVMIntEQ, left, right, "eq");
+                    if (is_float) {
+                        return LLVMBuildFCmp(codegen->builder, LLVMRealOEQ, left, right, "feq");
+                    } else {
+                        return LLVMBuildICmp(codegen->builder, LLVMIntEQ, left, right, "eq");
+                    }
                 case BINOP_NE:
-                    return LLVMBuildICmp(codegen->builder, LLVMIntNE, left, right, "ne");
+                    if (is_float) {
+                        return LLVMBuildFCmp(codegen->builder, LLVMRealONE, left, right, "fne");
+                    } else {
+                        return LLVMBuildICmp(codegen->builder, LLVMIntNE, left, right, "ne");
+                    }
                 case BINOP_LT:
-                    return LLVMBuildICmp(codegen->builder, LLVMIntSLT, left, right, "lt");
+                    if (is_float) {
+                        return LLVMBuildFCmp(codegen->builder, LLVMRealOLT, left, right, "flt");
+                    } else {
+                        return LLVMBuildICmp(codegen->builder, LLVMIntSLT, left, right, "lt");
+                    }
                 case BINOP_GT:
-                    return LLVMBuildICmp(codegen->builder, LLVMIntSGT, left, right, "gt");
+                    if (is_float) {
+                        return LLVMBuildFCmp(codegen->builder, LLVMRealOGT, left, right, "fgt");
+                    } else {
+                        return LLVMBuildICmp(codegen->builder, LLVMIntSGT, left, right, "gt");
+                    }
                 case BINOP_LE:
-                    return LLVMBuildICmp(codegen->builder, LLVMIntSLE, left, right, "le");
+                    if (is_float) {
+                        return LLVMBuildFCmp(codegen->builder, LLVMRealOLE, left, right, "fle");
+                    } else {
+                        return LLVMBuildICmp(codegen->builder, LLVMIntSLE, left, right, "le");
+                    }
                 case BINOP_GE:
-                    return LLVMBuildICmp(codegen->builder, LLVMIntSGE, left, right, "ge");
+                    if (is_float) {
+                        return LLVMBuildFCmp(codegen->builder, LLVMRealOGE, left, right, "fge");
+                    } else {
+                        return LLVMBuildICmp(codegen->builder, LLVMIntSGE, left, right, "ge");
+                    }
                 case BINOP_AND:
                     return LLVMBuildAnd(codegen->builder, left, right, "and");
                 case BINOP_OR:
@@ -699,6 +808,95 @@ static void codegen_statement(CodeGenerator* codegen, ASTNode* node) {
             // 这里需要实现方法查找和调用
             // 暂时跳过，等待更完整的实现
             fprintf(stderr, "Info: Method call %s.%s\n", object_name, method_name);
+            break;
+        }
+        
+        case NODE_PARALLEL: {
+            // 处理并行语句
+            ASTNode* body = node->data.parallel_stmt.body;
+            
+            // 分析循环体是否适合并行化
+            if (is_loop_suitable_for_parallelization(body)) {
+                fprintf(stderr, "Info: Loop body is suitable for OpenMP parallelization\n");
+                // 生成OpenMP并行指令
+                // 这里可以添加实际的OpenMP指令生成代码
+            } else {
+                fprintf(stderr, "Warning: Loop body contains operations that conflict with parallelization (I/O, events, etc.)\n");
+                fprintf(stderr, "Warning: Generating sequential code instead of parallel\n");
+            }
+            
+            // 无论是否并行化，都要生成循环体代码
+            codegen_statement(codegen, body);
+            break;
+        }
+        
+        case NODE_PARALLEL_SECTIONS: {
+            // 处理并行段语句
+            fprintf(stderr, "Info: Generating OpenMP parallel sections\n");
+            
+            // 处理每个段
+            if (node->data.parallel_sections_stmt.sections) {
+                codegen_statement(codegen, node->data.parallel_sections_stmt.sections);
+            }
+            break;
+        }
+        
+        case NODE_SECTION_LIST: {
+            // 处理段列表
+            for (int i = 0; i < node->data.list.count; i++) {
+                fprintf(stderr, "Info: Generating OpenMP section %d\n", i);
+                codegen_statement(codegen, node->data.list.items[i]);
+            }
+            break;
+        }
+        
+        case NODE_CRITICAL: {
+            // 处理临界区语句
+            fprintf(stderr, "Info: Generating OpenMP critical section\n");
+            
+            // 生成临界区代码
+            codegen_statement(codegen, node->data.critical_stmt.body);
+            break;
+        }
+        
+        case NODE_BARRIER: {
+            // 处理屏障语句
+            fprintf(stderr, "Info: Generating OpenMP barrier\n");
+            // OpenMP屏障在这里不需要额外的代码生成
+            break;
+        }
+        
+        case NODE_MASTER: {
+            // 处理主线程语句
+            fprintf(stderr, "Info: Generating OpenMP master region\n");
+            
+            // 生成主线程区域代码
+            codegen_statement(codegen, node->data.master_stmt.body);
+            break;
+        }
+        
+        case NODE_SINGLE: {
+            // 处理单线程语句
+            fprintf(stderr, "Info: Generating OpenMP single region\n");
+            
+            // 生成单线程区域代码
+            codegen_statement(codegen, node->data.single_stmt.body);
+            break;
+        }
+        
+        case NODE_THREADPRIVATE: {
+            // 处理线程私有语句
+            const char* var_name = node->data.threadprivate_stmt.variable_name;
+            fprintf(stderr, "Info: Marking variable '%s' as thread private\n", var_name);
+            
+            // 在符号表中标记变量为线程私有
+            Symbol* symbol = symbol_table_lookup(codegen->symbol_table, var_name);
+            if (symbol) {
+                // 这里可以设置一个标志来表示变量是线程私有的
+                // 实际的OpenMP实现需要更多的基础设施
+            } else {
+                fprintf(stderr, "Warning: Variable '%s' not found for threadprivate\n", var_name);
+            }
             break;
         }
             

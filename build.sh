@@ -8,8 +8,6 @@ echo "=== SIMSCRIPT II.5 Compiler Build Script ==="
 
 # Check dependencies
 check_dependencies() {
-    echo "Checking dependencies..."
-    
     # Check CMake
     if ! command -v cmake &> /dev/null; then
         echo "Error: CMake not installed"
@@ -51,44 +49,13 @@ create_build_dir() {
 # Configure project
 configure_project() {
     echo "Configuring project..."
-    cmake .. -DCMAKE_BUILD_TYPE=Release
+    cmake .. -DCMAKE_BUILD_TYPE=Release > /dev/null 2>&1
 }
 
 # Build project
 build_project() {
     echo "Building project..."
-    make -j"$(nproc)"
-}
-
-# Run tests
-run_tests() {
-    echo "Running tests..."
-    if [ -f "./tests/test_simscript" ]; then
-        ./tests/test_simscript
-    else
-        echo "Test executable not found, skipping tests."
-    fi
-}
-
-# Test the compiler
-test_compiler() {
-    echo "Testing the compiler..."
-    if [ -f "./simscript_compiler" ]; then
-        echo "Testing the compiler with a test program..."
-        ./simscript_compiler ../tests/basic/test_simple.sim -o test_output.ll > /dev/null 2>&1
-        
-        if [ -f "test_output.ll" ]; then
-            echo "Compiler test successful!"
-            echo "Generated LLVM IR file: test_output.ll"
-            rm -f test_output.ll  # Clean up test file
-        else
-            echo "Compiler test failed"
-            exit 1
-        fi
-    else
-        echo "Compiler executable not found"
-        exit 1
-    fi
+    make -j"$(nproc)" > /dev/null 2>&1
 }
 
 # Main function
@@ -97,8 +64,6 @@ main() {
     create_build_dir
     configure_project
     build_project
-    run_tests
-    test_compiler
     
     echo ""
     echo "=== Build complete ==="

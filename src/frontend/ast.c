@@ -327,13 +327,24 @@ static void expand_list(ASTNode* list) {
 
 /* 向语句列表添加语句 */
 void add_statement_to_list(ASTNode* list, ASTNode* statement) {
-    if (list->type != NODE_STATEMENT_LIST) return;
+    if (list->type != NODE_STATEMENT_LIST && list->type != NODE_SECTION_LIST) return;
     
     if (list->data.list.count >= list->data.list.capacity) {
         expand_list(list);
     }
     
     list->data.list.items[list->data.list.count++] = statement;
+}
+
+/* 将statement_list的内容复制到另一个list中 */
+void copy_statement_list_to_list(ASTNode* dest_list, ASTNode* src_list) {
+    if (!dest_list || !src_list) return;
+    if (dest_list->type != NODE_STATEMENT_LIST && dest_list->type != NODE_SECTION_LIST) return;
+    if (src_list->type != NODE_STATEMENT_LIST) return;
+    
+    for (int i = 0; i < src_list->data.list.count; i++) {
+        add_statement_to_list(dest_list, src_list->data.list.items[i]);
+    }
 }
 
 /* 向属性列表添加属性 */
@@ -672,5 +683,62 @@ ASTNode* create_method_call_node(char* object_name, char* method_name, ASTNode* 
     node->data.method_call.object_name = strdup(object_name);
     node->data.method_call.method_name = strdup(method_name);
     node->data.method_call.arguments = arguments;
+    return node;
+}
+
+/* 创建并行节点 */
+ASTNode* create_parallel_node(ASTNode* body) {
+    ASTNode* node = create_node(NODE_PARALLEL);
+    node->data.parallel_stmt.body = body;
+    return node;
+}
+
+/* 创建并行段节点 */
+ASTNode* create_parallel_sections_node(ASTNode* sections) {
+    ASTNode* node = create_node(NODE_PARALLEL_SECTIONS);
+    node->data.parallel_sections_stmt.sections = sections;
+    return node;
+}
+
+/* 创建段列表节点 */
+ASTNode* create_section_list_node() {
+    ASTNode* node = create_node(NODE_SECTION_LIST);
+    node->data.section_list.items = NULL;
+    node->data.section_list.count = 0;
+    node->data.section_list.capacity = 0;
+    return node;
+}
+
+/* 创建临界区节点 */
+ASTNode* create_critical_node(ASTNode* body) {
+    ASTNode* node = create_node(NODE_CRITICAL);
+    node->data.critical_stmt.body = body;
+    return node;
+}
+
+/* 创建屏障节点 */
+ASTNode* create_barrier_node() {
+    ASTNode* node = create_node(NODE_BARRIER);
+    return node;
+}
+
+/* 创建主线程节点 */
+ASTNode* create_master_node(ASTNode* body) {
+    ASTNode* node = create_node(NODE_MASTER);
+    node->data.master_stmt.body = body;
+    return node;
+}
+
+/* 创建单线程节点 */
+ASTNode* create_single_node(ASTNode* body) {
+    ASTNode* node = create_node(NODE_SINGLE);
+    node->data.single_stmt.body = body;
+    return node;
+}
+
+/* 创建线程私有节点 */
+ASTNode* create_threadprivate_node(char* variable_name) {
+    ASTNode* node = create_node(NODE_THREADPRIVATE);
+    node->data.threadprivate_stmt.variable_name = strdup(variable_name);
     return node;
 }

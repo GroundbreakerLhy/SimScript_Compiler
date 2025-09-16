@@ -92,6 +92,13 @@ WHITESPACE  [ \t]+
 "ADD"               { return ADD; }
 "REMOVE"            { return REMOVE; }
 "FROM"              { return FROM; }
+"PARALLEL"          { return PARALLEL; }
+"SECTIONS"          { return SECTIONS; }
+"CRITICAL"          { return CRITICAL; }
+"BARRIER"           { return BARRIER; }
+"MASTER"            { return MASTER; }
+"SINGLE"            { return SINGLE; }
+"THREADPRIVATE"     { return THREADPRIVATE; }
 
 "="                 { return ASSIGN; }
 "+"                 { return PLUS; }

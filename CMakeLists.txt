@@ -14,6 +14,9 @@ find_package(BISON REQUIRED)
 # 查找 LLVM
 find_package(LLVM REQUIRED CONFIG)
 
+# 查找 OpenMP
+find_package(OpenMP REQUIRED)
+
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
@@ -66,6 +69,11 @@ add_executable(simscript_compiler
 
 # 链接 LLVM 库
 target_link_libraries(simscript_compiler ${llvm_libs})
+
+# 链接 OpenMP 库
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(simscript_compiler OpenMP::OpenMP_CXX)
+endif()
 
 # 安装目标
 install(TARGETS simscript_compiler DESTINATION bin)

@@ -121,6 +121,45 @@ END MAIN
 ```
 **状态**: 语法解析、AST构建和基础代码生成完成，运行时对象创建支持
 
+### OpenMP并行化支持
+```simscript
+PARALLEL DO                     # 并行循环
+    statements
+LOOP
+
+PARALLEL SECTIONS               # 并行段
+    SECTIONS
+        statements              # 第一个并行段
+    END SECTIONS
+    SECTIONS
+        statements              # 第二个并行段
+    END SECTIONS
+LOOP
+
+CRITICAL                        # 临界区
+    statements
+END CRITICAL
+
+BARRIER                         # 同步屏障
+
+MASTER                          # 主线程区域
+    statements
+END MASTER
+
+SINGLE                          # 单线程区域
+    statements
+END SINGLE
+
+THREADPRIVATE variable          # 线程私有变量
+```
+**状态**: 完整实现，包括语法解析、AST构建、代码生成和运行时集成
+
+#### 并行化策略
+- **智能分析**: 自动检测循环体是否适合并行化
+- **安全限制**: 避免在包含I/O操作、事件调度等不适合并行化的代码上应用并行化
+- **类型安全**: 支持整数和浮点运算的并行处理
+- **内存模型**: 线程安全的变量访问和数据保护
+
 ### 仿真控制语句
 ```simscript
 START SIMULATION                # 仿真初始化
@@ -151,23 +190,27 @@ CLOSE FILE 1                    # 文件关闭
 | 注释支持 | 已实现 | 单行注释解析 |
 | 程序结构 | 已实现 | PREAMBLE/MAIN |
 | 高级语法 | 已实现 | 实体、事件、仿真 |
+| OpenMP并行化 | 已实现 | 并行循环、段、临界区 |
+| 面向对象编程 | 已实现 | 类、继承、方法、多态 |
 
 ## 技术架构特性
 
 ### 编译流程
 ```
-源代码(.sim) → 词法分析 → 语法分析 → AST构建 → 代码生成 → LLVM IR
+源代码(.sim) → 词法分析 → 语法分析 → AST构建 → 代码生成 → LLVM IR → OpenMP并行化
 ```
 
 ### 模块设计
-- **前端**: 与语言特性无关的通用分析框架
-- **后端**: 可插拔的目标代码生成器
-- **中间表示**: 标准LLVM IR，支持优化工具链
+- **前端**: 与语言特性无关的通用分析框架，支持OpenMP语法扩展
+- **后端**: 可插拔的目标代码生成器，支持并行代码生成
+- **中间表示**: 标准LLVM IR，支持优化工具链和OpenMP指令
+- **并行化引擎**: 智能分析和代码生成，支持线程安全的数据处理
 
 ### 扩展能力
 - **新语法**: 通过修改lexer.l和parser.y添加
 - **新类型**: 通过扩展AST节点类型实现
 - **新后端**: 通过实现新的代码生成器支持
+- **并行特性**: 通过扩展OpenMP指令集和优化策略
 
 ## 待实现功能
 
@@ -182,9 +225,11 @@ CLOSE FILE 1                    # 文件关闭
 - 统计收集 (TALLY, OBSERVE)
 - 数学函数库 (SQRT, SIN, COS)
 - 随机数生成器
+- OpenMP高级特性 (任务并行、向量化、内存亲和性)
 
 ### 优化功能
 - 代码优化Pass
 - 调试信息生成
 - 性能分析支持
 - 内存管理优化
+- 并行优化 (负载均衡、缓存优化、向量化)

@@ -87,7 +87,15 @@ typedef enum {
     NODE_CLASS_DECLARATION,
     NODE_METHOD_DECLARATION,
     NODE_OBJECT_CREATION,
-    NODE_METHOD_CALL
+    NODE_METHOD_CALL,
+    NODE_PARALLEL,
+    NODE_PARALLEL_SECTIONS,
+    NODE_SECTION_LIST,
+    NODE_CRITICAL,
+    NODE_BARRIER,
+    NODE_MASTER,
+    NODE_SINGLE,
+    NODE_THREADPRIVATE
 } NodeType;
 
 /* 前向声明 */
@@ -288,6 +296,40 @@ struct ASTNode {
             char* method_name;
             ASTNode* arguments;
         } method_call;
+        
+        struct {
+            ASTNode* body;
+        } parallel_stmt;
+        
+        struct {
+            ASTNode* sections;
+        } parallel_sections_stmt;
+        
+        struct {
+            ASTNode** items;
+            int count;
+            int capacity;
+        } section_list;
+        
+        struct {
+            ASTNode* body;
+        } critical_stmt;
+        
+        struct {
+            /* 屏障语句，无额外数据 */
+        } barrier_stmt;
+        
+        struct {
+            ASTNode* body;
+        } master_stmt;
+        
+        struct {
+            ASTNode* body;
+        } single_stmt;
+        
+        struct {
+            char* variable_name;
+        } threadprivate_stmt;
     } data;
 };
 
@@ -331,12 +373,21 @@ ASTNode* create_class_declaration_node(char* name, char* parent_class, ASTNode* 
 ASTNode* create_method_declaration_node(char* name, ASTNode* parameters, DataType return_type, ASTNode* body, int is_override);
 ASTNode* create_object_creation_node(char* variable_name, char* class_name, ASTNode* arguments);
 ASTNode* create_method_call_node(char* object_name, char* method_name, ASTNode* arguments);
+ASTNode* create_parallel_node(ASTNode* body);
+ASTNode* create_parallel_sections_node(ASTNode* sections);
+ASTNode* create_section_list_node();
+ASTNode* create_critical_node(ASTNode* body);
+ASTNode* create_barrier_node();
+ASTNode* create_master_node(ASTNode* body);
+ASTNode* create_single_node(ASTNode* body);
+ASTNode* create_threadprivate_node(char* variable_name);
 
 /* 列表操作函数 */
 void add_statement_to_list(ASTNode* list, ASTNode* statement);
 void add_attribute_to_list(ASTNode* list, ASTNode* attribute);
 void add_parameter_to_list(ASTNode* list, ASTNode* parameter);
 void add_expression_to_list(ASTNode* list, ASTNode* expression);
+void copy_statement_list_to_list(ASTNode* dest_list, ASTNode* src_list);
 
 /* AST 访问者接口 */
 typedef struct {
