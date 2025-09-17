@@ -64,12 +64,12 @@ CMakeLists.txt          # 构建配置
 sudo apt-get install flex bison llvm-14-dev cmake build-essential clang
 
 # macOS
-brew install flex bison llvm@16 cmake
+brew install flex bison llvm@16 cmake libomp && export OpenMP_ROOT=/opt/homebrew/opt/libomp
 ```
 
 ### 编译流程
 ```bash
-mkdir -p build && cd build && cmake .. && make -j$(nproc)
+mkdir -p build && cd build && cmake .. && make -j$(getconf _NPROCESSORS_ONLN)
 ```
 
 ## 技术文档
