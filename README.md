@@ -1,6 +1,6 @@
 # SIMSCRIPT II.5 编译器
 
-基于 SIMSCRIPT II.5 语言规范的编译器前端实现，采用 Flex/Bison 工具链构建词法语法分析器，生成 LLVM IR 中间代码。
+基于 SIMSCRIPT II.5 语言规范的完整编译器
 
 ## 技术架构
 
@@ -9,6 +9,9 @@
 | 词法分析 | Flex 2.6+ | Token流生成 |
 | 语法分析 | Bison 3.0+ | AST构建 |
 | 代码生成 | LLVM 14.0+ | IR代码生成 |
+| 目标代码生成 | LLVM Target | 本地代码生成 |
+| 链接器集成 | GCC Linker | 可执行文件链接 |
+| JIT执行引擎 | LLVM ORC JIT | 实时代码执行 |
 | 构建系统 | CMake 3.16+ | 自动化构建 |
 
 ## 语言特性支持
@@ -27,33 +30,38 @@
 - 仿真支持：START SIMULATION, SCHEDULE 事件调度
 - 标准库: 随机数生成、统计函数、数据结构、时间模拟
 
+
 ## 项目结构
 
 ```
 src/
-├── frontend/              # 编译器前端
-│   ├── lexer.l           # Flex词法规则
-│   ├── parser.y          # Bison语法规则
-│   ├── ast.[h|c]         # 抽象语法树
+├── main.cpp              # 编译器入口和命令行处理
+├── frontend/             # 编译器前端
+│   ├── lexer.l          # Flex词法规则
+│   ├── parser.y         # Bison语法规则
+│   ├── ast.[h|c]        # 抽象语法树
 │   └── symbol_table.[h|c] # 符号表管理
 ├── codegen/              # 代码生成后端
-│   ├── codegen.h         # 代码生成接口
-│   └── codegen.cpp       # LLVM IR生成
-└── main.cpp              # 编译器入口
+│   ├── codegen.h        # 代码生成接口
+│   └── codegen.cpp      # LLVM IR和本地代码生成
+├── debug/                # 调试和JIT执行
+│   ├── debug.[h|c]      # 调试接口
+│   ├── debug_runtime.[h|c] # 运行时调试支持
+│   ├── graph.[h|c]      # 可视化调试
+│   └── graph_runtime.c  # 图形运行时
+└── stdlib/               # 标准库实现
+    ├── data_structures/ # 数据结构
+    ├── math/            # 数学函数
+    └── time_simulation/ # 时间模拟
 
-tests/basic/              # 测试用例集合
-docs/                     # 技术文档
-CMakeLists.txt           # 构建配置
-build.sh                 # 构建脚本
-test.sh                  # 测试脚本
+docs/                    # 技术文档
+CMakeLists.txt          # 构建配置
 ```
-
-## 构建与安装
 
 ### 系统要求
 ```bash
 # Ubuntu/Debian
-sudo apt-get install flex bison llvm-14-dev cmake build-essential
+sudo apt-get install flex bison llvm-14-dev cmake build-essential clang
 
 # macOS
 brew install flex bison llvm@16 cmake
@@ -61,40 +69,10 @@ brew install flex bison llvm@16 cmake
 
 ### 编译流程
 ```bash
-./build.sh
-```
-
-### 手动构建
-```bash
-mkdir build && cd build
-cmake ..
-make -j$(nproc)
-```
-
-## 使用说明
-
-### 手动编译步骤
-```bash
-./build/simscript_compiler input.sim -o output.ll
-llc output.ll -o output.s
-gcc -no-pie output.s \
-    src/stdlib/data_structures/set.c \
-    src/stdlib/data_structures/queue.c \
-    src/stdlib/data_structures/resource.c \
-    src/stdlib/math/random.c \
-    src/stdlib/math/statistics.c \
-    src/stdlib/time_simulation/time_simulation.c \
-    -o executable -lm
-./executable
-```
-
-### 调试选项
-```bash
-./build/simscript_compiler input.sim --print-ast 
-./build/simscript_compiler input.sim --print-ir
+mkdir -p build && cd build && cmake .. && make -j$(nproc)
 ```
 
 ## 技术文档
 
-- [实现状态详细说明](docs/IMPLEMENTATION_STATUS.md)
+- [功能特性说明](docs/FEATURES.md)
 - [语法规范](docs/syntax.md)

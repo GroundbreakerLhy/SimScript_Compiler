@@ -2,5 +2,7 @@ build/
 tests/
 *.ll
 *.s
-test.sh
+*.sh
 .DS_Store
+*.o
+a.out

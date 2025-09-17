@@ -26,7 +26,7 @@ separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
 add_definitions(${LLVM_DEFINITIONS_LIST})
 
 # 查找需要的 LLVM 组件
-llvm_map_components_to_libnames(llvm_libs support core irreader analysis)
+llvm_map_components_to_libnames(llvm_libs support core irreader analysis executionengine mcjit native target orcjit)
 
 # 设置编译器标志
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -O2")
@@ -56,6 +56,12 @@ set(CODEGEN_SOURCES
     src/codegen/codegen.cpp
 )
 
+set(DEBUG_SOURCES
+    src/debug/debug.c
+    src/debug/graph.c
+    src/debug/debug_runtime.c
+)
+
 set(STDLIB_SOURCES
     src/stdlib/data_structures/set.c
     src/stdlib/data_structures/queue.c
@@ -73,6 +79,7 @@ set(MAIN_SOURCES
 add_executable(simscript_compiler
     ${FRONTEND_SOURCES}
     ${CODEGEN_SOURCES}
+    ${DEBUG_SOURCES}
     ${STDLIB_SOURCES}
     ${MAIN_SOURCES}
 )

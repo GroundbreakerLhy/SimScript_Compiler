@@ -1,9 +1,12 @@
 #include "codegen.h"
 #include "../frontend/symbol_table.h"
+#include "../debug/debug.h"
+#include "../debug/debug_runtime.h"
 #include <llvm-c/Core.h>
 #include <llvm-c/Analysis.h>
 #include <llvm-c/Target.h>
 #include <llvm-c/TargetMachine.h>
+#include <llvm-c/ExecutionEngine.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,12 +18,93 @@ struct CodeGenerator {
     LLVMBuilderRef builder;
     LLVMValueRef current_function;
     SymbolTable* symbol_table;
+    DebugContext* debug_ctx;
+    // JIT 执行相关
+    LLVMExecutionEngineRef execution_engine;
+    int jit_initialized;
 };
 
-/* 前向声明 */
-static LLVMValueRef codegen_expression(CodeGenerator* codegen, ASTNode* node);
-static void codegen_statement(CodeGenerator* codegen, ASTNode* node);
-static void codegen_function(CodeGenerator* codegen, ASTNode* node);
+/* 辅助函数：记录变量值 */
+static void debug_log_variable_value(CodeGenerator* codegen, const char* var_name, LLVMValueRef value) {
+    if (!codegen->debug_ctx || !value) return;
+
+    // 获取变量类型字符串
+    const char* type_str = "unknown";
+    LLVMTypeRef type = LLVMTypeOf(value);
+    LLVMTypeKind kind = LLVMGetTypeKind(type);
+
+    switch (kind) {
+        case LLVMDoubleTypeKind: type_str = "REAL"; break;
+        case LLVMIntegerTypeKind: type_str = "INT"; break;
+        case LLVMPointerTypeKind: type_str = "TEXT"; break;
+        default: type_str = "unknown"; break;
+    }
+
+    // 对于常量，我们可以直接获取值
+    char value_str[64] = "unknown";
+    if (LLVMIsConstant(value)) {
+        if (kind == LLVMDoubleTypeKind) {
+            double dval = LLVMConstRealGetDouble(value, NULL);
+            snprintf(value_str, sizeof(value_str), "%.6f", dval);
+        } else if (kind == LLVMIntegerTypeKind) {
+            long long ival = LLVMConstIntGetSExtValue(value);
+            snprintf(value_str, sizeof(value_str), "%lld", ival);
+        } else if (kind == LLVMPointerTypeKind && LLVMIsGlobalConstant(value)) {
+            // 对于字符串常量，显示为 string
+            strcpy(value_str, "string");
+        }
+    } else {
+        // 对于非常量值，显示为 runtime_value
+        strcpy(value_str, "runtime_value");
+    }
+
+    debug_log_variable(codegen->debug_ctx, var_name, type_str, value_str);
+}
+
+/* 调试钩子函数：检查断点 */
+static void debug_breakpoint_hook(CodeGenerator* codegen, int line_number, const char* function_name) {
+    if (!codegen->debug_ctx) return;
+
+    // 设置当前位置
+    debug_set_location(codegen->debug_ctx, line_number, function_name);
+
+    // 检查调试器状态
+    DebuggerState state = debug_get_debugger_state(codegen->debug_ctx);
+    if (state == DEBUGGER_BREAK || state == DEBUGGER_STEP) {
+        // 进入调试器交互模式
+        printf("\n=== DEBUG BREAKPOINT ===\n");
+        printf("Location: %s:%d\n", function_name ? function_name : "<unknown>", line_number);
+        printf("Type 'help' for commands, 'continue' to resume, 'quit' to exit\n");
+
+        char command[256];
+        while (1) {
+            printf("(debug) ");
+            if (fgets(command, sizeof(command), stdin) == NULL) break;
+
+            // 移除换行符
+            command[strcspn(command, "\n")] = 0;
+
+            if (strcmp(command, "help") == 0) {
+                printf("Available commands:\n");
+                printf("  continue (c)    - Continue execution\n");
+                printf("  step (s)        - Step to next instruction\n");
+                printf("  breakpoints (b) - List breakpoints\n");
+                printf("  variables (v)   - List local variables\n");
+                printf("  print <var>     - Print variable value\n");
+                printf("  memory <addr> <size> - Examine memory\n");
+                printf("  quit (q)        - Exit debugger\n");
+            } else if (debug_process_command(codegen->debug_ctx, command)) {
+                if (debug_get_debugger_state(codegen->debug_ctx) == DEBUGGER_FINISHED) {
+                    break;
+                }
+                if (strcmp(command, "continue") == 0 || strcmp(command, "c") == 0 ||
+                    strcmp(command, "step") == 0 || strcmp(command, "s") == 0) {
+                    break;
+                }
+            }
+        }
+    }
+}
 
 /* 分析循环是否适合OpenMP并行化 */
 static int is_loop_suitable_for_parallelization(ASTNode* loop_body) {
@@ -79,6 +163,11 @@ static int is_loop_suitable_for_parallelization(ASTNode* loop_body) {
 
 /* 创建代码生成器 */
 CodeGenerator* codegen_create(const char* module_name) {
+    return codegen_create_with_debug(module_name, NULL);
+}
+
+/* 创建带调试功能的代码生成器 */
+CodeGenerator* codegen_create_with_debug(const char* module_name, DebugContext* debug_ctx) {
     CodeGenerator* codegen = (CodeGenerator*)malloc(sizeof(CodeGenerator));
     if (!codegen) return NULL;
     
@@ -87,6 +176,20 @@ CodeGenerator* codegen_create(const char* module_name) {
     codegen->builder = LLVMCreateBuilderInContext(codegen->context);
     codegen->current_function = NULL;
     codegen->symbol_table = symbol_table_create();
+    codegen->debug_ctx = debug_ctx;
+    codegen->execution_engine = NULL;
+    codegen->jit_initialized = 0;
+    
+    // 如果有调试上下文，声明调试运行时函数
+    if (debug_ctx) {
+        // 声明调试钩子函数
+        LLVMTypeRef hook_params[] = {
+            LLVMInt32TypeInContext(codegen->context),  // line_number
+            LLVMPointerType(LLVMInt8TypeInContext(codegen->context), 0)  // function_name
+        };
+        LLVMTypeRef hook_type = LLVMFunctionType(LLVMVoidTypeInContext(codegen->context), hook_params, 2, 0);
+        LLVMAddFunction(codegen->module, "simscript_debug_hook", hook_type);
+    }
     
     return codegen;
 }
@@ -95,11 +198,98 @@ CodeGenerator* codegen_create(const char* module_name) {
 void codegen_destroy(CodeGenerator* codegen) {
     if (!codegen) return;
     
+    // 注意：不在这里清理JIT引擎，让它自然清理以避免段错误
+    
     if (codegen->symbol_table) symbol_table_destroy(codegen->symbol_table);
     if (codegen->builder) LLVMDisposeBuilder(codegen->builder);
     if (codegen->module) LLVMDisposeModule(codegen->module);
     if (codegen->context) LLVMContextDispose(codegen->context);
+    // 注意：不在这里销毁debug_ctx，它可能被其他地方使用
     free(codegen);
+}
+
+/* 获取调试上下文 */
+DebugContext* codegen_get_debug_context(CodeGenerator* codegen) {
+    return codegen ? codegen->debug_ctx : NULL;
+}
+
+/* 设置调试上下文 */
+void codegen_set_debug_context(CodeGenerator* codegen, DebugContext* debug_ctx) {
+    if (codegen) {
+        codegen->debug_ctx = debug_ctx;
+    }
+}
+
+/* ===== JIT 执行和调试功能实现 ===== */
+
+/* 初始化JIT执行引擎 */
+int codegen_init_jit(CodeGenerator* codegen) {
+    if (!codegen || codegen->jit_initialized) return 1;
+    
+    char* error = NULL;
+    LLVMLinkInMCJIT();
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+    LLVMInitializeNativeAsmParser();
+    
+    if (LLVMCreateExecutionEngineForModule(&codegen->execution_engine, codegen->module, &error) != 0) {
+        fprintf(stderr, "Error: Failed to create execution engine: %s\n", error);
+        LLVMDisposeMessage(error);
+        return 0;
+    }
+    
+    // 注册调试运行时函数
+    if (codegen->debug_ctx) {
+        LLVMAddGlobalMapping(codegen->execution_engine, 
+                           LLVMGetNamedFunction(codegen->module, "simscript_debug_hook"), 
+                           (void*)simscript_debug_hook);
+        
+        // 设置全局调试上下文
+        simscript_debug_set_context(codegen->debug_ctx);
+    }
+    
+    codegen->jit_initialized = 1;
+    return 1;
+}
+
+/* 执行生成的代码（使用JIT） */
+int codegen_execute_jit(CodeGenerator* codegen) {
+    if (!codegen || !codegen->jit_initialized) {
+        fprintf(stderr, "Error: JIT not initialized\n");
+        return 0;
+    }
+    
+    // 查找main函数
+    LLVMValueRef main_func = LLVMGetNamedFunction(codegen->module, "main");
+    if (!main_func) {
+        fprintf(stderr, "Error: No main function found\n");
+        return 0;
+    }
+    
+    // 执行main函数
+    typedef int (*MainFunc)();
+    MainFunc func_ptr = (MainFunc)LLVMGetFunctionAddress(codegen->execution_engine, "main");
+    if (!func_ptr) {
+        fprintf(stderr, "Error: Failed to get function address\n");
+        return 0;
+    }
+    
+    int result = func_ptr();
+    
+    return 1;
+}
+
+/* 销毁JIT执行引擎 */
+void codegen_destroy_jit(CodeGenerator* codegen) {
+    if (codegen) {
+        // 标记JIT已清理，实际清理在codegen_destroy中进行
+        codegen->jit_initialized = 0;
+    }
+}
+
+/* 检查是否支持JIT调试 */
+int codegen_supports_debug_execution(CodeGenerator* codegen) {
+    return codegen && codegen->debug_ctx != NULL;
 }
 
 /* 获取 LLVM 类型 */
@@ -290,7 +480,26 @@ static LLVMValueRef codegen_expression(CodeGenerator* codegen, ASTNode* node) {
                 return NULL;
             }
             
-            // 准备参数
+            // 调试：记录函数调用开始
+            if (codegen->debug_ctx) {
+                debug_log_function_call(codegen->debug_ctx, node->data.function_call.name, 0);
+                debug_perf_start(codegen->debug_ctx, node->data.function_call.name);
+                
+                // 可视化：添加函数调用节点
+                int func_node = debug_viz_add_node(codegen->debug_ctx, node->data.function_call.name, "ellipse", "lightgreen");
+                if (func_node >= 0) {
+                    // 记录节点ID以便后续连接
+                }
+                
+                // 插入调试钩子调用
+                LLVMValueRef hook_func = LLVMGetNamedFunction(codegen->module, "simscript_debug_hook");
+                if (hook_func) {
+                    LLVMValueRef line_num = LLVMConstInt(LLVMInt32TypeInContext(codegen->context), 0, 0);
+                    LLVMValueRef func_name = LLVMBuildGlobalStringPtr(codegen->builder, node->data.function_call.name, "func_name");
+                    LLVMValueRef hook_args[] = {line_num, func_name};
+                    LLVMBuildCall2(codegen->builder, LLVMGetElementType(LLVMTypeOf(hook_func)), hook_func, hook_args, 2, "");
+                }
+            }            // 准备参数
             LLVMValueRef* args = NULL;
             int arg_count = 0;
             
@@ -310,7 +519,11 @@ static LLVMValueRef codegen_expression(CodeGenerator* codegen, ASTNode* node) {
             LLVMTypeRef func_type = LLVMGetElementType(LLVMTypeOf(func));
             LLVMValueRef result = LLVMBuildCall2(codegen->builder, func_type, func, args, arg_count, "call");
             
-            if (args) free(args);
+    // 调试：记录函数调用结束
+    if (codegen->debug_ctx) {
+        debug_log_function_return(codegen->debug_ctx, node->data.function_call.name, NULL);
+        debug_perf_end(codegen->debug_ctx, node->data.function_call.name);
+    }            if (args) free(args);
             return result;
         }
 
@@ -318,7 +531,11 @@ static LLVMValueRef codegen_expression(CodeGenerator* codegen, ASTNode* node) {
             // 处理标准库函数调用
             const char* func_name = node->data.stdlib_function_call.name;
 
-            // 准备参数
+    // 调试：记录标准库函数调用开始
+    if (codegen->debug_ctx) {
+        debug_log_function_call(codegen->debug_ctx, func_name, 0);
+        debug_perf_start(codegen->debug_ctx, func_name);
+    }            // 准备参数
             LLVMValueRef* args = NULL;
             int arg_count = 0;
 
@@ -416,7 +633,11 @@ static LLVMValueRef codegen_expression(CodeGenerator* codegen, ASTNode* node) {
                 result = NULL;
             }
 
-            if (args) free(args);
+    // 调试：记录标准库函数调用结束
+    if (codegen->debug_ctx) {
+        debug_log_function_return(codegen->debug_ctx, func_name, NULL);
+        debug_perf_end(codegen->debug_ctx, func_name);
+    }            if (args) free(args);
             return result;
         }
         
@@ -466,6 +687,16 @@ static void codegen_statement(CodeGenerator* codegen, ASTNode* node) {
                 if (init_value) {
                     LLVMBuildStore(codegen->builder, init_value, alloca);
                     symbol->is_initialized = 1;
+                    
+                    // 调试：记录变量初始化
+                    debug_log_variable_value(codegen, name, init_value);
+                    
+                    // 可视化：添加变量初始化节点
+                    if (codegen->debug_ctx) {
+                        char label[256];
+                        snprintf(label, sizeof(label), "%s = init", name);
+                        debug_viz_add_node(codegen->debug_ctx, label, "box", "lightyellow");
+                    }
                 }
             }
             break;
@@ -505,6 +736,16 @@ static void codegen_statement(CodeGenerator* codegen, ASTNode* node) {
                 if (value) {
                     LLVMBuildStore(codegen->builder, value, (LLVMValueRef)symbol->llvm_value);
                     symbol->is_initialized = 1;
+                    
+                    // 调试：记录变量赋值
+                    debug_log_variable_value(codegen, target, value);
+                    
+                    // 可视化：添加变量赋值节点
+                    if (codegen->debug_ctx) {
+                        char label[256];
+                        snprintf(label, sizeof(label), "%s = value", target);
+                        debug_viz_add_node(codegen->debug_ctx, label, "box", "lightyellow");
+                    }
                 }
             }
             break;
@@ -1186,4 +1427,83 @@ void codegen_print_ir(CodeGenerator* codegen) {
     char* ir = LLVMPrintModuleToString(codegen->module);
     printf("%s", ir);
     LLVMDisposeMessage(ir);
+}
+
+/* ===== 目标代码生成和链接功能实现 ===== */
+
+/* 生成目标文件 (.o) */
+int codegen_emit_object_file(CodeGenerator* codegen, const char* filename) {
+    if (!codegen) return 0;
+    
+    char* error = NULL;
+    
+    // 初始化目标
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+    LLVMInitializeNativeAsmParser();
+    
+    // 获取目标三元组
+    const char* triple = LLVMGetDefaultTargetTriple();
+    LLVMSetTarget(codegen->module, triple);
+    
+    // 创建目标机器
+    LLVMTargetRef target = NULL;
+    if (LLVMGetTargetFromTriple(triple, &target, &error) != 0) {
+        fprintf(stderr, "Error: Failed to get target: %s\n", error);
+        LLVMDisposeMessage(error);
+        LLVMDisposeMessage((char*)triple);
+        return 0;
+    }
+    
+    // 创建目标机器
+    LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(
+        target, triple, "generic", "", 
+        LLVMCodeGenLevelDefault, LLVMRelocDefault, LLVMCodeModelDefault);
+    
+    if (!target_machine) {
+        fprintf(stderr, "Error: Failed to create target machine\n");
+        LLVMDisposeMessage((char*)triple);
+        return 0;
+    }
+    
+    // 生成目标文件
+    if (LLVMTargetMachineEmitToFile(target_machine, codegen->module, 
+                                   (char*)filename, LLVMObjectFile, &error) != 0) {
+        fprintf(stderr, "Error: Failed to emit object file: %s\n", error);
+        LLVMDisposeMessage(error);
+        LLVMDisposeTargetMachine(target_machine);
+        LLVMDisposeMessage((char*)triple);
+        return 0;
+    }
+    
+    LLVMDisposeTargetMachine(target_machine);
+    LLVMDisposeMessage((char*)triple);
+    return 1;
+}
+
+/* 生成可执行文件 */
+int codegen_emit_executable(CodeGenerator* codegen, const char* filename) {
+    if (!codegen) return 0;
+    
+    // 先生成临时目标文件
+    const char* temp_obj = "temp_simscript.o";
+    
+    if (!codegen_emit_object_file(codegen, temp_obj)) {
+        return 0;
+    }
+    
+    // 使用系统链接器链接生成可执行文件
+    char link_cmd[1024];
+    snprintf(link_cmd, sizeof(link_cmd), "gcc -no-pie -o %s %s", filename, temp_obj);
+    
+    int result = system(link_cmd);
+    if (result != 0) {
+        fprintf(stderr, "Error: Failed to link executable\n");
+        remove(temp_obj);
+        return 0;
+    }
+    
+    // 清理临时文件
+    remove(temp_obj);
+    return 1;
 }
